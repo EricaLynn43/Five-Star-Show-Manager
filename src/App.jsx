@@ -1114,6 +1114,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
 function ShiftScheduler({ show, employees, onUpdateShow }) {
   const shifts = show.shifts || [];
   const [shiftHours, setShiftHours] = useState(4);
+  const [peoplePerShift, setPeoplePerShift] = useState(2);
   const [assigningId, setAssigningId] = useState(null);
 
   function getShowDates() {
@@ -1150,7 +1151,7 @@ function ShiftScheduler({ show, employees, onUpdateShow }) {
     for (const date of dates) {
       let cursor = startMins;
       while (cursor + shiftMins <= endMins) {
-        newShifts.push({ id: genId(), date, startTime: toTime(cursor), endTime: toTime(cursor + shiftMins), assignedEmployees: [] });
+        newShifts.push({ id: genId(), date, startTime: toTime(cursor), endTime: toTime(cursor + shiftMins), assignedEmployees: [], peopleNeeded: peoplePerShift });
         cursor += shiftMins;
       }
     }
@@ -1207,6 +1208,16 @@ function ShiftScheduler({ show, employees, onUpdateShow }) {
               style={{ width:32, height:32, borderRadius:8, border:"2px solid #EDE6DC", background:"#fff", fontSize:18, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, color:"#1B3A5C" }}>+</button>
           </div>
         </div>
+        <div>
+          <label style={{ fontSize:13, fontWeight:700, color:"#374151", display:"block", marginBottom:6 }}>People Per Shift</label>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <button onClick={() => setPeoplePerShift(p => Math.max(1, p - 1))}
+              style={{ width:32, height:32, borderRadius:8, border:"2px solid #EDE6DC", background:"#fff", fontSize:18, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, color:"#1B3A5C" }}>−</button>
+            <span style={{ fontSize:18, fontWeight:700, color:"#1B3A5C", minWidth:40, textAlign:"center" }}>{peoplePerShift}</span>
+            <button onClick={() => setPeoplePerShift(p => Math.min(20, p + 1))}
+              style={{ width:32, height:32, borderRadius:8, border:"2px solid #EDE6DC", background:"#fff", fontSize:18, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, color:"#1B3A5C" }}>+</button>
+          </div>
+        </div>
         <div style={{ flex:1 }}>
           {show.startTime && show.endTime
             ? <p style={{ margin:0, fontSize:13, color:"#6B7280" }}>
@@ -1232,14 +1243,25 @@ function ShiftScheduler({ show, employees, onUpdateShow }) {
                 </div>
                 {(byDate[date] || []).map(shift => {
                   const empNames = (shift.assignedEmployees || []).map(id => employees.find(e => e.id === id)).filter(Boolean);
+                  const needed = shift.peopleNeeded || 1;
+                  const filled = empNames.length;
+                  const full = filled >= needed;
                   const isSel = assigningId === shift.id;
+                  const borderColor = isSel ? "#1B3A5C" : full ? "#6EE7B7" : filled > 0 ? "#FCD34D" : "#EDE6DC";
+                  const bgColor    = isSel ? "#1B3A5C" : full ? "#ECFDF5" : filled > 0 ? "#FFFBEB" : "#fff";
                   return (
                     <div key={shift.id} onClick={() => setAssigningId(isSel ? null : shift.id)}
-                      style={{ borderRadius:10, border:"2px solid", borderColor: isSel ? "#1B3A5C" : empNames.length > 0 ? "#6EE7B7" : "#EDE6DC",
-                        background: isSel ? "#1B3A5C" : empNames.length > 0 ? "#ECFDF5" : "#fff",
+                      style={{ borderRadius:10, border:"2px solid", borderColor, background: bgColor,
                         padding:"10px 12px", marginBottom:8, cursor:"pointer", transition:"all 0.15s" }}>
-                      <div style={{ fontSize:13, fontWeight:700, color: isSel ? "#fff" : "#1B3A5C", marginBottom:6 }}>
-                        {fmt12(shift.startTime)} – {fmt12(shift.endTime)}
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+                        <span style={{ fontSize:13, fontWeight:700, color: isSel ? "#fff" : "#1B3A5C" }}>
+                          {fmt12(shift.startTime)} – {fmt12(shift.endTime)}
+                        </span>
+                        <span style={{ fontSize:11, fontWeight:700, borderRadius:20, padding:"2px 8px",
+                          background: isSel?"rgba(255,255,255,0.2)": full?"#D1FAE5": filled>0?"#FEF3C7":"#F3F4F6",
+                          color: isSel?"#fff": full?"#065F46": filled>0?"#92400E":"#6B7280" }}>
+                          {filled}/{needed}
+                        </span>
                       </div>
                       {empNames.length === 0
                         ? <div style={{ fontSize:12, color: isSel ? "rgba(255,255,255,0.6)" : "#9CA3AF", fontStyle:"italic" }}>Tap to assign</div>
