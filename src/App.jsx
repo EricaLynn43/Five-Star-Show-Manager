@@ -726,12 +726,12 @@ function ShowFormModal({ show, employees, onSave, onClose }) {
             }
           </div>
           <SectionHead title="Financials" />
+          {money("Total Show Cost","totalDue")}
+          <CalendarPicker value={form.finalPaymentDueDate} onChange={v => set("finalPaymentDueDate",v)} label="Final Payment Due Date" />
           {money("Deposit Due","depositDue")}
           <CalendarPicker value={form.depositDueDate} onChange={v => set("depositDueDate",v)} label="Deposit Due Date" />
           {money("Deposit Paid","depositPaid")}
           <CalendarPicker value={form.depositPaidDate} onChange={v => set("depositPaidDate",v)} label="Date Deposit Paid" />
-          {money("Total Show Cost","totalDue")}
-          <CalendarPicker value={form.finalPaymentDueDate} onChange={v => set("finalPaymentDueDate",v)} label="Final Payment Due Date" />
           {money("Balance / Final Payment","totalPaid")}
           <CalendarPicker value={form.totalPaidDate} onChange={v => set("totalPaidDate",v)} label="Date Balance Paid" />
         </div>
