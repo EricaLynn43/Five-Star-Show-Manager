@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 // ─── Supabase ──────────────────────────────────────────────────────────────
@@ -467,6 +467,81 @@ const EMPTY_SHOW = { name:"", date:"", startTime:"", endTime:"", category:"", st
   totalPaid:"", totalPaidDate:"", assignedEmployees:[], employeeReports:[], needToKnow:"",
   inventory:[], checklist:[], communications:[], rating:null, ratingNotes:"" };
 
+function CalendarPicker({ value, onChange, label, required }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const parsed = value ? new Date(value + "T00:00:00") : null;
+  const today = new Date();
+  const [viewYear, setViewYear]  = useState(parsed ? parsed.getFullYear()  : today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(parsed ? parsed.getMonth()     : today.getMonth());
+  useEffect(() => {
+    if (!open) return;
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [open]);
+  const daysInMonth   = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstWeekday  = new Date(viewYear, viewMonth, 1).getDay();
+  const selectDay = day => {
+    const d  = new Date(viewYear, viewMonth, day);
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    onChange(`${d.getFullYear()}-${mm}-${dd}`);
+    setOpen(false);
+  };
+  const prevMonth = () => { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); };
+  const nextMonth = () => { if (viewMonth === 11) { setViewMonth(0);  setViewYear(y => y + 1); } else setViewMonth(m => m + 1); };
+  const display = parsed ? parsed.toLocaleDateString("en-US", { month:"long", day:"numeric", year:"numeric" }) : "";
+  return (
+    <div ref={ref} style={{ position:"relative" }}>
+      <label style={{ fontSize:15, fontWeight:700, color:"#374151", display:"block", marginBottom:6 }}>
+        {label}{required && <span style={{ color:"#DC2626" }}> *</span>}
+      </label>
+      <div onClick={() => setOpen(o => !o)} style={{
+        width:"100%", padding:"12px 14px", borderRadius:9, border:"2px solid #EDE6DC",
+        fontSize:15, color: display ? "#1F2937" : "#9CA3AF", background:"#fff",
+        cursor:"pointer", boxSizing:"border-box", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <span>{display || "Select a date…"}</span>
+        <span style={{ fontSize:18 }}>📅</span>
+      </div>
+      {open && (
+        <div style={{
+          position:"absolute", top:"calc(100% + 6px)", left:0, zIndex:3000,
+          background:"#fff", borderRadius:14, boxShadow:"0 8px 32px rgba(0,0,0,0.18)",
+          padding:"16px", minWidth:290, border:"1px solid #EDE6DC" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+            <button onClick={prevMonth} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:"#1B3A5C", fontWeight:700, padding:"4px 10px" }}>‹</button>
+            <span style={{ fontWeight:700, color:"#1B3A5C", fontSize:15 }}>{MONTHS[viewMonth]} {viewYear}</span>
+            <button onClick={nextMonth} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:"#1B3A5C", fontWeight:700, padding:"4px 10px" }}>›</button>
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:2, textAlign:"center" }}>
+            {DAYS.map(d => <div key={d} style={{ fontSize:11, fontWeight:700, color:"#9CA3AF", padding:"4px 0" }}>{d}</div>)}
+            {Array.from({ length: firstWeekday }).map((_, i) => <div key={`b${i}`} />)}
+            {Array.from({ length: daysInMonth }).map((_, i) => {
+              const day = i + 1;
+              const sel = parsed && parsed.getFullYear() === viewYear && parsed.getMonth() === viewMonth && parsed.getDate() === day;
+              const tod = today.getFullYear() === viewYear && today.getMonth() === viewMonth && today.getDate() === day;
+              return (
+                <button key={day} onClick={() => selectDay(day)} style={{
+                  padding:"7px 2px", borderRadius:7, border:"none", cursor:"pointer",
+                  background: sel ? "#1B3A5C" : tod ? "#F0EBE3" : "transparent",
+                  color: sel ? "#fff" : "#1F2937",
+                  fontWeight: sel || tod ? 700 : 400, fontSize:14 }}>{day}</button>
+              );
+            })}
+          </div>
+          {value && (
+            <div style={{ borderTop:"1px solid #EDE6DC", marginTop:10, paddingTop:8, textAlign:"right" }}>
+              <button onClick={() => { onChange(""); setOpen(false); }}
+                style={{ background:"none", border:"none", color:"#9CA3AF", fontSize:13, cursor:"pointer" }}>Clear</button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ShowFormModal({ show, employees, onSave, onClose }) {
   const [form, setForm] = useState(show ? { ...show } : { ...EMPTY_SHOW });
   function set(k, v) { setForm(p => ({ ...p, [k]:v })); }
@@ -509,7 +584,7 @@ function ShowFormModal({ show, employees, onSave, onClose }) {
         <div style={{ padding:"20px 24px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, overflowY:"auto", flex:1 }}>
           <SectionHead title="Show Information" />
           {inp("Show Name","name","text",true)}
-          {inp("Date","date","date",true)}
+          <CalendarPicker value={form.date} onChange={v => set("date",v)} label="Date" required />
           <div>
             <label style={{ fontSize:15, fontWeight:700, color:"#374151", display:"block", marginBottom:6 }}>Event Category</label>
             <select value={form.category} onChange={e => set("category", e.target.value)}
@@ -538,6 +613,10 @@ function ShowFormModal({ show, employees, onSave, onClose }) {
             </select>
           </div>
           {inp("Zip Code","zip")}
+          <SectionHead title="Contact Information" />
+          {inp("Contact Name","contactName")}
+          {inp("Contact Email","contactEmail","email")}
+          {inp("Contact Phone","contactPhone","tel")}
           <SectionHead title="Booth Details" />
           {inp("Booth Size (e.g. 10x10)","boothSize")}
           {inp("Expected Attendance","expectedParticipation","number")}
@@ -560,10 +639,6 @@ function ShowFormModal({ show, employees, onSave, onClose }) {
               <Toggle value={form.needsTrailer}  onChange={v => set("needsTrailer", v)}  label="Trailer Needed" />
             </div>
           </div>
-          <SectionHead title="Contact Information" />
-          {inp("Contact Name","contactName")}
-          {inp("Contact Email","contactEmail","email")}
-          {inp("Contact Phone","contactPhone","tel")}
           <SectionHead title="Staffing" />
           {inp("Number of Employees Needed","employeesNeeded","number")}
           {inp("Contacts Collected (after show)","contactsCollected","number")}
@@ -594,13 +669,13 @@ function ShowFormModal({ show, employees, onSave, onClose }) {
           </div>
           <SectionHead title="Financials" />
           {money("Deposit Due","depositDue")}
-          {inp("Deposit Due Date","depositDueDate","date")}
+          <CalendarPicker value={form.depositDueDate} onChange={v => set("depositDueDate",v)} label="Deposit Due Date" />
           {money("Deposit Paid","depositPaid")}
-          {inp("Date Deposit Paid","depositPaidDate","date")}
+          <CalendarPicker value={form.depositPaidDate} onChange={v => set("depositPaidDate",v)} label="Date Deposit Paid" />
           {money("Total Show Cost","totalDue")}
-          {inp("Final Payment Due Date","finalPaymentDueDate","date")}
+          <CalendarPicker value={form.finalPaymentDueDate} onChange={v => set("finalPaymentDueDate",v)} label="Final Payment Due Date" />
           {money("Balance / Final Payment","totalPaid")}
-          {inp("Date Balance Paid","totalPaidDate","date")}
+          <CalendarPicker value={form.totalPaidDate} onChange={v => set("totalPaidDate",v)} label="Date Balance Paid" />
         </div>
         <div style={{ padding:"20px 32px", borderTop:"1px solid #EDE6DC", display:"flex", gap:12, justifyContent:"flex-end", background:"#fff" }}>
           <button onClick={onClose} style={{ padding:"13px 24px", borderRadius:10, border:"2px solid #EDE6DC", background:"#fff", color:"#6B7280", fontSize:15, cursor:"pointer", fontWeight:600 }}>Cancel</button>
