@@ -542,6 +542,46 @@ function CalendarPicker({ value, onChange, label, required }) {
   );
 }
 
+function AddressAutocomplete({ value, onChange, onPlaceSelected }) {
+  const inputRef = useRef(null);
+  const autocompleteRef = useRef(null);
+  useEffect(() => {
+    if (!window.google || !inputRef.current) return;
+    autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
+      types: ["address"],
+      componentRestrictions: { country: "us" },
+    });
+    autocompleteRef.current.addListener("place_changed", () => {
+      const place = autocompleteRef.current.getPlace();
+      if (!place.address_components) return;
+      let street = "", city = "", state = "", zip = "";
+      const get = type => (place.address_components.find(c => c.types.includes(type)) || {}).long_name || "";
+      const getShort = type => (place.address_components.find(c => c.types.includes(type)) || {}).short_name || "";
+      const num   = get("street_number");
+      const road  = get("route");
+      street = num && road ? `${num} ${road}` : road || num;
+      city   = get("locality") || get("sublocality") || get("neighborhood");
+      state  = getShort("administrative_area_level_1");
+      zip    = get("postal_code");
+      onPlaceSelected({ street, city, state, zip });
+    });
+    return () => { if (autocompleteRef.current) window.google.maps.event.clearInstanceListeners(autocompleteRef.current); };
+  }, []);
+  return (
+    <div>
+      <label style={{ fontSize:15, fontWeight:700, color:"#374151", display:"block", marginBottom:6 }}>Street Address</label>
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Start typing an address…"
+        style={{ width:"100%", padding:"12px 14px", borderRadius:9, border:"2px solid #EDE6DC", fontSize:15, color:"#1F2937", background:"#fff", outline:"none", boxSizing:"border-box" }}
+      />
+    </div>
+  );
+}
+
 function ShowFormModal({ show, employees, onSave, onClose }) {
   const [form, setForm] = useState(show ? { ...show } : { ...EMPTY_SHOW });
   function set(k, v) { setForm(p => ({ ...p, [k]:v })); }
@@ -602,7 +642,15 @@ function ShowFormModal({ show, employees, onSave, onClose }) {
           </div>
           {inp("Start Time","startTime","time")}
           {inp("End Time","endTime","time")}
-          <div style={{ gridColumn:"1/-1" }}>{inp("Street Address","street")}</div>
+          <div style={{ gridColumn:"1/-1" }}>
+            <AddressAutocomplete
+              value={form.street || ""}
+              onChange={v => set("street", v)}
+              onPlaceSelected={({ street, city, state, zip }) =>
+                setForm(p => ({ ...p, street, city, state, zip }))
+              }
+            />
+          </div>
           {inp("City","city")}
           <div>
             <label style={{ fontSize:15, fontWeight:700, color:"#374151", display:"block", marginBottom:6 }}>State</label>
