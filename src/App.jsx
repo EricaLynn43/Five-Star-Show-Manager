@@ -474,7 +474,7 @@ const EMPTY_SHOW = { name:"", date:"", endDate:"", startTime:"", endTime:"", cat
   employeesNeeded:"", contactsCollected:"", depositDue:"", depositDueDate:"",
   depositPaid:"", depositPaidDate:"", totalDue:"", finalPaymentDueDate:"",
   totalPaid:"", totalPaidDate:"", assignedEmployees:[], employeeReports:[], needToKnow:"",
-  inventory:[], checklist:[], communications:[], documents:[], rating:null, ratingNotes:"" };
+  inventory:[], checklist:[], communications:[], documents:[], shifts:[], rating:null, ratingNotes:"" };
 
 function CalendarPicker({ value, onChange, label, required }) {
   const [open, setOpen] = useState(false);
@@ -1028,6 +1028,8 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
             </div>
           )}
 
+          <ShiftScheduler show={show} employees={employees} onUpdateShow={onUpdateShow} />
+
           <DocumentsSection show={show} onUpdateShow={onUpdateShow} userId={userId} />
 
           <div style={{ marginTop:20, paddingTop:22, borderTop:"2px solid #F0E8DF" }}>
@@ -1104,6 +1106,193 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Shift Scheduler ──────────────────────────────────────────────────────────
+function ShiftScheduler({ show, employees, onUpdateShow }) {
+  const shifts = show.shifts || [];
+  const [shiftHours, setShiftHours] = useState(4);
+  const [assigningId, setAssigningId] = useState(null);
+
+  function getShowDates() {
+    if (!show.date) return [];
+    const dates = [];
+    const end = show.endDate ? new Date(show.endDate + "T00:00:00") : new Date(show.date + "T00:00:00");
+    for (let d = new Date(show.date + "T00:00:00"); d <= end; d.setDate(d.getDate() + 1)) {
+      dates.push(d.toISOString().slice(0, 10));
+    }
+    return dates;
+  }
+
+  function fmt12(t) {
+    if (!t) return "";
+    const [h, m] = t.split(":").map(Number);
+    const ampm = h >= 12 ? "pm" : "am";
+    const h12 = h % 12 || 12;
+    return m ? `${h12}:${String(m).padStart(2,"0")}${ampm}` : `${h12}${ampm}`;
+  }
+
+  function generateShifts() {
+    if (!show.startTime || !show.endTime) {
+      alert("Please set a Start Time and End Time on the show first (Edit Show).");
+      return;
+    }
+    const dates = getShowDates();
+    const toMins = t => { const [h,m] = t.split(":").map(Number); return h*60+m; };
+    const toTime = m => `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
+    const startMins = toMins(show.startTime);
+    const endMins   = toMins(show.endTime);
+    const shiftMins = shiftHours * 60;
+    if (shiftMins <= 0 || startMins >= endMins) { alert("Invalid shift length or show times."); return; }
+    const newShifts = [];
+    for (const date of dates) {
+      let cursor = startMins;
+      while (cursor + shiftMins <= endMins) {
+        newShifts.push({ id: genId(), date, startTime: toTime(cursor), endTime: toTime(cursor + shiftMins), assignedEmployees: [] });
+        cursor += shiftMins;
+      }
+    }
+    if (shifts.length > 0 && !window.confirm(`Replace the existing ${shifts.length} shift(s) with ${newShifts.length} new shift(s)?`)) return;
+    onUpdateShow({ ...show, shifts: newShifts });
+    setAssigningId(null);
+  }
+
+  function toggleEmp(shiftId, empId) {
+    onUpdateShow({ ...show, shifts: shifts.map(s => {
+      if (s.id !== shiftId) return s;
+      const a = s.assignedEmployees || [];
+      return { ...s, assignedEmployees: a.includes(empId) ? a.filter(id => id !== empId) : [...a, empId] };
+    })});
+  }
+
+  function deleteShifts() {
+    if (!window.confirm("Remove all shifts for this show?")) return;
+    onUpdateShow({ ...show, shifts: [] });
+    setAssigningId(null);
+  }
+
+  const dates = getShowDates();
+  const byDate = Object.fromEntries(dates.map(d => [d, shifts.filter(s => s.date === d).sort((a,b) => a.startTime.localeCompare(b.startTime))]));
+  const assigningShift = shifts.find(s => s.id === assigningId);
+
+  const dayLabel = d => {
+    const dt = new Date(d + "T00:00:00");
+    return dt.toLocaleDateString("en-US", { weekday:"short", month:"short", day:"numeric" });
+  };
+
+  return (
+    <div style={{ marginTop:20, paddingTop:20, borderTop:"2px solid #F0E8DF" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+        <p style={{ margin:0, fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>
+          Shift Schedule {shifts.length > 0 && `(${shifts.length} shifts)`}
+        </p>
+        {shifts.length > 0 && (
+          <button onClick={deleteShifts} style={{ background:"none", border:"none", color:"#9CA3AF", fontSize:13, cursor:"pointer", fontWeight:600 }}>
+            Clear All
+          </button>
+        )}
+      </div>
+
+      {/* Setup panel */}
+      <div style={{ background:"#F7F2EB", borderRadius:12, padding:"16px 18px", marginBottom: shifts.length > 0 ? 18 : 0, display:"flex", flexWrap:"wrap", gap:14, alignItems:"flex-end" }}>
+        <div>
+          <label style={{ fontSize:13, fontWeight:700, color:"#374151", display:"block", marginBottom:6 }}>Shift Length (hours)</label>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+            <button onClick={() => setShiftHours(h => Math.max(1, h - 0.5))}
+              style={{ width:32, height:32, borderRadius:8, border:"2px solid #EDE6DC", background:"#fff", fontSize:18, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, color:"#1B3A5C" }}>−</button>
+            <span style={{ fontSize:18, fontWeight:700, color:"#1B3A5C", minWidth:40, textAlign:"center" }}>{shiftHours}h</span>
+            <button onClick={() => setShiftHours(h => Math.min(12, h + 0.5))}
+              style={{ width:32, height:32, borderRadius:8, border:"2px solid #EDE6DC", background:"#fff", fontSize:18, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontWeight:700, color:"#1B3A5C" }}>+</button>
+          </div>
+        </div>
+        <div style={{ flex:1 }}>
+          {show.startTime && show.endTime
+            ? <p style={{ margin:0, fontSize:13, color:"#6B7280" }}>
+                Show hours: <b>{fmt12(show.startTime)} – {fmt12(show.endTime)}</b> · will create <b>{Math.floor(((() => { const [sh,sm]=show.startTime.split(":").map(Number); const [eh,em]=show.endTime.split(":").map(Number); return (eh*60+em)-(sh*60+sm); })()) / (shiftHours*60))}</b> shift{Math.floor(((() => { const [sh,sm]=show.startTime.split(":").map(Number); const [eh,em]=show.endTime.split(":").map(Number); return (eh*60+em)-(sh*60+sm); })()) / (shiftHours*60)) !== 1 ? "s":""}  per day
+              </p>
+            : <p style={{ margin:0, fontSize:13, color:"#F59E0B", fontWeight:600 }}>⚠️ Set Start & End Time on the show to generate shifts.</p>
+          }
+        </div>
+        <button onClick={generateShifts}
+          style={{ padding:"10px 22px", borderRadius:10, border:"none", background:"#1B3A5C", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>
+          {shifts.length > 0 ? "↺ Regenerate" : "⚡ Generate Shifts"}
+        </button>
+      </div>
+
+      {/* Schedule grid */}
+      {shifts.length > 0 && (
+        <div style={{ overflowX:"auto" }}>
+          <div style={{ display:"grid", gridTemplateColumns:`repeat(${dates.length}, minmax(130px, 1fr))`, gap:10, minWidth: dates.length > 1 ? dates.length * 140 : "auto" }}>
+            {dates.map(date => (
+              <div key={date}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#1B3A5C", textAlign:"center", marginBottom:8, padding:"6px 0", borderBottom:"2px solid #EDE6DC" }}>
+                  {dayLabel(date)}
+                </div>
+                {(byDate[date] || []).map(shift => {
+                  const empNames = (shift.assignedEmployees || []).map(id => employees.find(e => e.id === id)).filter(Boolean);
+                  const isSel = assigningId === shift.id;
+                  return (
+                    <div key={shift.id} onClick={() => setAssigningId(isSel ? null : shift.id)}
+                      style={{ borderRadius:10, border:"2px solid", borderColor: isSel ? "#1B3A5C" : empNames.length > 0 ? "#6EE7B7" : "#EDE6DC",
+                        background: isSel ? "#1B3A5C" : empNames.length > 0 ? "#ECFDF5" : "#fff",
+                        padding:"10px 12px", marginBottom:8, cursor:"pointer", transition:"all 0.15s" }}>
+                      <div style={{ fontSize:13, fontWeight:700, color: isSel ? "#fff" : "#1B3A5C", marginBottom:6 }}>
+                        {fmt12(shift.startTime)} – {fmt12(shift.endTime)}
+                      </div>
+                      {empNames.length === 0
+                        ? <div style={{ fontSize:12, color: isSel ? "rgba(255,255,255,0.6)" : "#9CA3AF", fontStyle:"italic" }}>Tap to assign</div>
+                        : empNames.map(e => (
+                          <div key={e.id} style={{ display:"flex", alignItems:"center", gap:6, marginBottom:3 }}>
+                            <div style={{ width:20, height:20, borderRadius:"50%", background: isSel?"rgba(255,255,255,0.3)":"#1B3A5C", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontSize:9, fontWeight:700, flexShrink:0 }}>
+                              {e.firstName[0]}{e.lastName[0]}
+                            </div>
+                            <span style={{ fontSize:12, color: isSel?"#fff":"#374151", fontWeight:600, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                              {e.firstName} {e.lastName}
+                            </span>
+                          </div>
+                        ))
+                      }
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+
+          {/* Employee assignment panel */}
+          {assigningShift && (
+            <div style={{ marginTop:14, background:"#F7F2EB", borderRadius:12, padding:"16px 18px", border:"2px solid #1B3A5C" }}>
+              <p style={{ margin:"0 0 12px", fontWeight:700, fontSize:14, color:"#1B3A5C" }}>
+                Assign employees — {fmt12(assigningShift.startTime)} – {fmt12(assigningShift.endTime)} · {dayLabel(assigningShift.date)}
+              </p>
+              {employees.length === 0
+                ? <p style={{ color:"#9CA3AF", margin:0, fontSize:13 }}>No employees added yet.</p>
+                : <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                    {employees.map(emp => {
+                      const on = (assigningShift.assignedEmployees || []).includes(emp.id);
+                      return (
+                        <button key={emp.id} onClick={() => toggleEmp(assigningShift.id, emp.id)} style={{
+                          padding:"8px 16px", borderRadius:20, border:"2px solid",
+                          borderColor: on ? "#10B981" : "#EDE6DC",
+                          background: on ? "#ECFDF5" : "#fff",
+                          color: on ? "#065F46" : "#4B5563",
+                          fontWeight:700, fontSize:13, cursor:"pointer" }}>
+                          {on ? "✓ " : ""}{emp.firstName} {emp.lastName}
+                        </button>
+                      );
+                    })}
+                  </div>
+              }
+              <button onClick={() => setAssigningId(null)}
+                style={{ marginTop:12, background:"none", border:"none", color:"#6B7280", fontSize:13, cursor:"pointer", fontWeight:600 }}>
+                Done ✓
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
