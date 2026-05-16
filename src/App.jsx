@@ -43,6 +43,15 @@ function fmtDate(d) {
   const [y, m, day] = d.split("-");
   return MONTHS[+m - 1] + " " + +day + ", " + y;
 }
+function fmtDateRange(startDate, endDate) {
+  if (!startDate) return "—";
+  if (!endDate || endDate === startDate) return fmtDate(startDate);
+  const [sy, sm, sd] = startDate.split("-");
+  const [ey, em, ed] = endDate.split("-");
+  if (sy === ey && sm === em) return MONTHS[+sm - 1] + " " + +sd + "–" + +ed + ", " + sy;
+  if (sy === ey) return MONTHS[+sm - 1] + " " + +sd + " – " + MONTHS[+em - 1] + " " + +ed + ", " + sy;
+  return fmtDate(startDate) + " – " + fmtDate(endDate);
+}
 function fmtMoney(n) {
   return (n != null && n !== "") ? "$" + Number(n).toLocaleString() : "—";
 }
@@ -445,7 +454,7 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
                   : assigned.map(s => (
                     <div key={s.id} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:7 }}>
                       <div style={{ width:9, height:9, borderRadius:"50%", background:STATUSES[s.status].dot, flexShrink:0 }} />
-                      <span style={{ fontSize:14, color:"#4B5563" }}>{s.name} · {fmtDate(s.date)}</span>
+                      <span style={{ fontSize:14, color:"#4B5563" }}>{s.name} · {fmtDateRange(s.date, s.endDate)}</span>
                     </div>
                   ))
                 }
@@ -459,7 +468,7 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
 }
 
 // ─── Show Form Modal ────────────────────────────────────────────────────────
-const EMPTY_SHOW = { name:"", date:"", startTime:"", endTime:"", category:"", status:"lead",
+const EMPTY_SHOW = { name:"", date:"", endDate:"", startTime:"", endTime:"", category:"", status:"lead",
   street:"", city:"", state:"", zip:"", contactName:"", contactEmail:"", contactPhone:"",
   boothSize:"", expectedParticipation:"", isIndoor:true, hasElectrical:false, needsTrailer:false,
   employeesNeeded:"", contactsCollected:"", depositDue:"", depositDueDate:"",
@@ -624,7 +633,8 @@ function ShowFormModal({ show, employees, onSave, onClose }) {
         <div style={{ padding:"20px 24px", display:"grid", gridTemplateColumns:"1fr 1fr", gap:14, overflowY:"auto", flex:1 }}>
           <SectionHead title="Show Information" />
           {inp("Show Name","name","text",true)}
-          <CalendarPicker value={form.date} onChange={v => set("date",v)} label="Date" required />
+          <CalendarPicker value={form.date} onChange={v => set("date",v)} label="Start Date" required />
+          <CalendarPicker value={form.endDate} onChange={v => set("endDate",v)} label="End Date (optional)" />
           <div>
             <label style={{ fontSize:15, fontWeight:700, color:"#374151", display:"block", marginBottom:6 }}>Event Category</label>
             <select value={form.category} onChange={e => set("category", e.target.value)}
@@ -845,7 +855,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"11px 0", borderBottom:"1px solid #F5EDE3" }}>
       <span style={{ fontSize:15, color:"#6B7280", fontWeight:500 }}>{label}</span>
       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-        {date && <span style={{ fontSize:12, fontWeight:600, color:"#9CA3AF", background:"#F3F4F6", borderRadius:6, padding:"3px 8px", whiteSpace:"nowrap" }}>📅 {fmtDate(date)}</span>}
+        {date && <span style={{ fontSize:12, fontWeight:600, color:"#9CA3AF", background:"#F3F4F6", borderRadius:6, padding:"3px 8px", whiteSpace:"nowrap" }}>📅 {fmtDateRange(date, show.endDate)}</span>}
         <span style={{ fontSize:15, color:accent||"#1F2937", fontWeight:700 }}>{amount || "—"}</span>
       </div>
     </div>
@@ -866,7 +876,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
         </div>
         <div style={{ padding:28 }}>
           <p style={{ margin:"0 0 4px", fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Show Details</p>
-          <Row label="Date" value={fmtDate(show.date)} />
+          <Row label="Date" value={fmtDateRange(show.date, show.endDate)} />
           <Row label="Time" value={show.startTime && show.endTime ? show.startTime + " – " + show.endTime : null} />
           <Row label="Category" value={show.category} />
           {(show.street || show.city) && (() => {
@@ -1153,7 +1163,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, isMobile })
                       <div style={{ fontWeight:700, fontSize:16, color:"#1F2937", flex:1, paddingRight:8, lineHeight:1.2 }}>{show.name}</div>
                       <StatusBadge status={show.status} />
                     </div>
-                    <div style={{ fontSize:13, color:"#6B7280", marginBottom:8 }}>{fmtDate(show.date)}{show.category ? " · " + show.category : ""}</div>
+                    <div style={{ fontSize:13, color:"#6B7280", marginBottom:8 }}>{fmtDateRange(show.date, show.endDate)}{show.category ? " · " + show.category : ""}</div>
                     <div style={{ display:"flex", gap:12, fontSize:13 }}>
                       <span style={{ color:"#059669", fontWeight:700 }}>Dep: {fmtMoney(show.depositPaid)}</span>
                       <span style={{ color:balance > 0 ? "#DC2626" : "#059669", fontWeight:700 }}>Bal: {fmtMoney(balance)}</span>
@@ -1185,7 +1195,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, isMobile })
                           onMouseEnter={e => e.currentTarget.style.background="#FAF6F0"}
                           onMouseLeave={e => e.currentTarget.style.background="transparent"}>
                           <td style={{ padding:"15px 18px", fontWeight:700, color:"#1F2937", fontSize:15 }}>{show.name}</td>
-                          <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14, whiteSpace:"nowrap" }}>{fmtDate(show.date)}</td>
+                          <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14, whiteSpace:"nowrap" }}>{fmtDateRange(show.date, show.endDate)}</td>
                           <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14 }}>{show.category}</td>
                           <td style={{ padding:"15px 18px" }}><StatusBadge status={show.status} /></td>
                           <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14 }}>{show.boothSize || "—"}</td>
@@ -1350,7 +1360,7 @@ function PipelineView({ shows, onUpdateShow, onViewShow }) {
                       onMouseEnter={e => e.currentTarget.style.boxShadow="0 4px 12px rgba(0,0,0,0.1)"}
                       onMouseLeave={e => e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)"}>
                       <div style={{ fontWeight:700, fontSize:14, color:"#1F2937", marginBottom:5, lineHeight:1.3 }}>{show.name}</div>
-                      <div style={{ fontSize:12, color:"#6B7280", marginBottom:4 }}>📅 {fmtDate(show.date)}</div>
+                      <div style={{ fontSize:12, color:"#6B7280", marginBottom:4 }}>📅 {fmtDateRange(show.date, show.endDate)}</div>
                       {show.date && daysUntil >= 0 && daysUntil <= 30 && (
                         <div style={{ fontSize:12, fontWeight:700, color:daysUntil<=7?"#DC2626":daysUntil<=14?"#D97706":"#059669" }}>
                           {daysUntil===0?"🚨 TODAY":daysUntil===1?"⚠️ Tomorrow":daysUntil+" days away"}
@@ -1518,7 +1528,7 @@ function ReportsView({ shows, isMobile }) {
                     onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
                     <td style={{ padding:"13px 18px", fontWeight:700, color:"#1F2937", fontSize:14 }}>{show.name}</td>
                     <td style={{ padding:"13px 18px", color:"#4B5563", fontSize:14 }}>{show.city||"—"}</td>
-                    <td style={{ padding:"13px 18px", color:"#4B5563", fontSize:13, whiteSpace:"nowrap" }}>{fmtDate(show.date)}</td>
+                    <td style={{ padding:"13px 18px", color:"#4B5563", fontSize:13, whiteSpace:"nowrap" }}>{fmtDateRange(show.date, show.endDate)}</td>
                     <td style={{ padding:"13px 18px", color:"#4B5563", fontSize:13 }}>{show.category||"—"}</td>
                     <td style={{ padding:"13px 18px" }}><StatusBadge status={show.status} /></td>
                     <td style={{ padding:"13px 18px", fontWeight:700, color:"#1B3A5C", fontSize:14 }}>{contacts>0?contacts.toLocaleString():<span style={{color:"#D1D5DB"}}>—</span>}</td>
@@ -1555,7 +1565,7 @@ function PostShowSurvey({ show, employee, onSubmit, onClose }) {
       <div style={{ background:"#fff", borderRadius:"22px 22px 0 0", width:"100%", maxWidth:500, maxHeight:"92vh", overflow:"auto", boxShadow:"0 -8px 40px rgba(0,0,0,0.2)" }}>
         <div style={{ background:"#1B3A5C", padding:"22px 26px" }}>
           <h2 style={{ margin:0, color:"#fff", fontFamily:"'Playfair Display',serif", fontSize:22 }}>Post-Show Report</h2>
-          <p style={{ margin:"6px 0 0", color:"rgba(255,255,255,0.7)", fontSize:14 }}>{show.name} · {fmtDate(show.date)}</p>
+          <p style={{ margin:"6px 0 0", color:"rgba(255,255,255,0.7)", fontSize:14 }}>{show.name} · {fmtDateRange(show.date, show.endDate)}</p>
         </div>
         <div style={{ padding:"26px 28px" }}>
           {[
@@ -1675,7 +1685,7 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming }) {
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
                   <div style={{ background:"#F7F2EB", borderRadius:9, padding:"10px 14px" }}>
                     <div style={{ fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:3 }}>Date</div>
-                    <div style={{ fontSize:15, fontWeight:700, color:"#1F2937" }}>{fmtDate(show.date)}</div>
+                    <div style={{ fontSize:15, fontWeight:700, color:"#1F2937" }}>{fmtDateRange(show.date, show.endDate)}</div>
                     {daysUntil >= 0 && daysUntil <= 30 && (
                       <div style={{ fontSize:12, fontWeight:700, marginTop:3, color:daysUntil<=3?"#DC2626":daysUntil<=7?"#D97706":"#059669" }}>
                         {daysUntil===0?"🚨 TODAY":daysUntil===1?"⚠️ Tomorrow":daysUntil+" days away"}
@@ -1727,7 +1737,7 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming }) {
               <div key={show.id} style={{ background:"#fff", borderRadius:14, border:"1px solid #EDE6DC", padding:"15px 20px", marginBottom:10, display:"flex", alignItems:"center", gap:14 }}>
                 <div style={{ flex:1 }}>
                   <div style={{ fontWeight:700, fontSize:15, color:"#1F2937" }}>{show.name}</div>
-                  <div style={{ fontSize:13, color:"#6B7280", marginTop:2 }}>{fmtDate(show.date)}</div>
+                  <div style={{ fontSize:13, color:"#6B7280", marginTop:2 }}>{fmtDateRange(show.date, show.endDate)}</div>
                   {report && <div style={{ fontSize:12, color:"#059669", marginTop:4, fontWeight:700 }}>{report.leadsAcquired} contacts · {report.appointmentsBooked} appointments booked</div>}
                 </div>
                 {report
@@ -2027,7 +2037,7 @@ function DashboardView({ shows, setView, onAddShow, onViewShow, isMobile }) {
                 onMouseLeave={e => e.currentTarget.style.background="transparent"}>
                 <div>
                   <div style={{ fontWeight:700, color:"#1F2937", fontSize:16 }}>{show.name}</div>
-                  <div style={{ color:"#6B7280", fontSize:14, marginTop:2 }}>{fmtDate(show.date)} · {show.startTime}–{show.endTime}</div>
+                  <div style={{ color:"#6B7280", fontSize:14, marginTop:2 }}>{fmtDateRange(show.date, show.endDate)} · {show.startTime}–{show.endTime}</div>
                 </div>
                 <StatusBadge status={show.status} />
               </div>
