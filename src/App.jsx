@@ -474,7 +474,7 @@ const EMPTY_SHOW = { name:"", date:"", endDate:"", startTime:"", endTime:"", cat
   employeesNeeded:"", contactsCollected:"", depositDue:"", depositDueDate:"",
   depositPaid:"", depositPaidDate:"", totalDue:"", finalPaymentDueDate:"",
   totalPaid:"", totalPaidDate:"", assignedEmployees:[], employeeReports:[], needToKnow:"",
-  inventory:[], checklist:[], communications:[], rating:null, ratingNotes:"" };
+  inventory:[], checklist:[], communications:[], documents:[], rating:null, ratingNotes:"" };
 
 function CalendarPicker({ value, onChange, label, required }) {
   const [open, setOpen] = useState(false);
@@ -825,7 +825,7 @@ const COMM_COLORS = {
   other: { bg:"#F7F2EB", border:"#D1C8BB", text:"#4B5563" },
 };
 
-function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDuplicate }) {
+function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDuplicate, userId }) {
   const assigned = employees.filter(e => (show.assignedEmployees || []).includes(e.id));
   const totalPaidCalc = (+show.depositPaid||0) + (+show.totalPaid||0);
   const balance = (+show.totalDue||0) - totalPaidCalc;
@@ -1028,6 +1028,8 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
             </div>
           )}
 
+          <DocumentsSection show={show} onUpdateShow={onUpdateShow} userId={userId} />
+
           <div style={{ marginTop:20, paddingTop:22, borderTop:"2px solid #F0E8DF" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
               <p style={{ margin:0, fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Communication Log ({comms.length})</p>
@@ -1102,6 +1104,96 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── Documents Section ────────────────────────────────────────────────────────
+function DocumentsSection({ show, onUpdateShow, userId }) {
+  const docs = show.documents || [];
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef(null);
+
+  async function handleUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${userId}/${show.id}/${Date.now()}_${safeName}`;
+      const { error } = await supabase.storage.from("show-documents").upload(path, file);
+      if (error) throw error;
+      const doc = { id: genId(), name: file.name, size: file.size, type: file.type, path, uploadedAt: new Date().toISOString() };
+      onUpdateShow({ ...show, documents: [...docs, doc] });
+    } catch (err) {
+      alert("Upload failed: " + err.message);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function openDoc(doc) {
+    const { data, error } = await supabase.storage.from("show-documents").createSignedUrl(doc.path, 3600);
+    if (error) { alert("Could not open file: " + error.message); return; }
+    window.open(data.signedUrl, "_blank");
+  }
+
+  async function handleDelete(doc) {
+    if (!window.confirm(`Delete "${doc.name}"?`)) return;
+    await supabase.storage.from("show-documents").remove([doc.path]);
+    onUpdateShow({ ...show, documents: docs.filter(d => d.id !== doc.id) });
+  }
+
+  function formatSize(bytes) {
+    if (!bytes) return "";
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / 1048576).toFixed(1) + " MB";
+  }
+
+  function fileIcon(type) {
+    if (!type) return "📎";
+    if (type.includes("pdf"))   return "📄";
+    if (type.includes("image")) return "🖼️";
+    if (type.includes("sheet") || type.includes("excel") || type.includes("csv")) return "📊";
+    if (type.includes("word")  || type.includes("document")) return "📝";
+    return "📎";
+  }
+
+  return (
+    <div style={{ marginTop:20, paddingTop:20, borderTop:"2px solid #F0E8DF" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
+        <p style={{ margin:0, fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>
+          Documents ({docs.length})
+        </p>
+        <button onClick={() => fileRef.current && fileRef.current.click()} disabled={uploading}
+          style={{ background:"#1B3A5C", color:"#fff", border:"none", borderRadius:20, padding:"8px 18px", fontSize:14, fontWeight:700, cursor:uploading?"not-allowed":"pointer", opacity:uploading?0.6:1 }}>
+          {uploading ? "Uploading…" : "📎 Upload File"}
+        </button>
+        <input ref={fileRef} type="file" style={{ display:"none" }} onChange={handleUpload}
+          accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx,.csv,.txt" />
+      </div>
+      {docs.length === 0
+        ? <p style={{ color:"#9CA3AF", margin:0, fontSize:14 }}>No documents yet. Upload registration forms, maps, invoices, receipts, and more.</p>
+        : docs.map(doc => (
+          <div key={doc.id} style={{ display:"flex", alignItems:"center", gap:12, padding:"10px 14px", borderRadius:10, border:"1px solid #EDE6DC", background:"#FAFAF9", marginBottom:8 }}>
+            <span style={{ fontSize:24, flexShrink:0 }}>{fileIcon(doc.type)}</span>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontWeight:700, fontSize:14, color:"#1F2937", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{doc.name}</div>
+              <div style={{ fontSize:12, color:"#9CA3AF", marginTop:2 }}>{formatSize(doc.size)} · {fmtDate(doc.uploadedAt?.slice(0,10))}</div>
+            </div>
+            <button onClick={() => openDoc(doc)}
+              style={{ padding:"6px 14px", borderRadius:8, background:"#EFF6FF", border:"1px solid #93C5FD", color:"#1D4ED8", fontWeight:700, fontSize:13, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0 }}>
+              ⬇ Open
+            </button>
+            <button onClick={() => handleDelete(doc)}
+              style={{ background:"none", border:"none", color:"#D1D5DB", fontSize:18, cursor:"pointer", padding:"2px 4px", flexShrink:0, lineHeight:1 }}
+              onMouseEnter={e => e.currentTarget.style.color="#EF4444"}
+              onMouseLeave={e => e.currentTarget.style.color="#D1D5DB"}>×</button>
+          </div>
+        ))
+      }
     </div>
   );
 }
@@ -1990,6 +2082,7 @@ export default function App() {
           onClose={() => setViewing(null)}
           onUpdateShow={updateShow}
           onDuplicate={() => duplicateShow(viewingShow)}
+          userId={user?.id}
         />
       )}
     </>
