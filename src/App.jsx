@@ -2,8 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { createClient } from "@supabase/supabase-js";
 
 // ─── Supabase ──────────────────────────────────────────────────────────────
-const SUPABASE_URL = "https://mxpdzsnpvwxlqqxrugwd.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14cGR6c25wdnd4bHFxeHJ1Z3dkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2NTgwNjksImV4cCI6MjA5NDIzNDA2OX0.cOteO1YCq6rhVk9qwpz1l2euCGd0rLdQSPi37cBHQWQ";
+const SUPABASE_URL = "https://mxpdzsnpvwxllqxrugwd.supabase.co";
+const SUPABASE_KEY = "sb_publishable_fUFq0vKDYQ5KkJ2Op2Oxog_kOMfRMjT";
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // ─── Constants ─────────────────────────────────────────────────────────────
