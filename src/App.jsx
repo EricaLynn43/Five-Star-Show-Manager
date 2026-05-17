@@ -395,12 +395,101 @@ function LoginScreen() {
   );
 }
 
+// ─── Set Password Screen (employee first-time setup) ───────────────────────
+function SetPasswordScreen() {
+  const [password, setPassword] = useState("");
+  const [confirm,  setConfirm]  = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [done,     setDone]     = useState(false);
+  const [error,    setError]    = useState("");
+
+  async function handleSet(e) {
+    e.preventDefault();
+    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
+    if (password !== confirm)  { setError("Passwords don't match."); return; }
+    setLoading(true); setError("");
+    const { error: err } = await supabase.auth.updateUser({ password });
+    if (err) { setError(err.message); setLoading(false); return; }
+    setDone(true); setLoading(false);
+  }
+
+  const inputStyle = { width:"100%", padding:"14px 16px", borderRadius:10, border:"2px solid #EDE6DC",
+    fontSize:16, outline:"none", boxSizing:"border-box", fontFamily:"'Nunito',sans-serif", color:"#1F2937" };
+
+  return (
+    <div style={{ minHeight:"100vh", background:"#F7F2EB", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+      <style>{"@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Nunito:wght@400;500;600;700&display=swap');"}</style>
+      <div style={{ background:"#fff", borderRadius:24, padding:"44px 40px", width:"100%", maxWidth:440, boxShadow:"0 8px 40px rgba(27,58,92,0.12)" }}>
+        <div style={{ textAlign:"center", marginBottom:36 }}>
+          <div style={{ fontSize:52, marginBottom:12 }}>🔑</div>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", color:"#1B3A5C", fontSize:28, margin:"0 0 8px" }}>Create Your Password</h1>
+          <p style={{ color:"#6B7280", fontSize:15, margin:0 }}>Set a password to finish setting up your employee account.</p>
+        </div>
+        {done ? (
+          <div style={{ textAlign:"center" }}>
+            <div style={{ fontSize:48, marginBottom:16 }}>✅</div>
+            <h2 style={{ color:"#059669", fontFamily:"'Playfair Display',serif", fontSize:22, marginBottom:10 }}>You're all set!</h2>
+            <p style={{ color:"#6B7280", fontSize:15 }}>Your password is saved. Your portal is loading…</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSet}>
+            {error && (
+              <div style={{ background:"#FEF2F2", border:"1px solid #FECACA", borderRadius:10, padding:"12px 16px", marginBottom:20, color:"#DC2626", fontSize:14, fontWeight:600 }}>{error}</div>
+            )}
+            <div style={{ marginBottom:18 }}>
+              <label style={{ display:"block", fontSize:15, fontWeight:700, color:"#374151", marginBottom:7 }}>New Password</label>
+              <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Minimum 8 characters" style={inputStyle} />
+            </div>
+            <div style={{ marginBottom:28 }}>
+              <label style={{ display:"block", fontSize:15, fontWeight:700, color:"#374151", marginBottom:7 }}>Confirm Password</label>
+              <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required placeholder="Re-enter password" style={inputStyle} />
+            </div>
+            <button type="submit" disabled={loading}
+              style={{ width:"100%", padding:"16px", borderRadius:12, border:"none", background:"#1B3A5C", color:"#fff", fontSize:17, fontWeight:700, cursor:loading?"wait":"pointer", opacity:loading?0.7:1, fontFamily:"'Nunito',sans-serif" }}>
+              {loading ? "Saving…" : "Set Password & Continue"}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Employees View ────────────────────────────────────────────────────────
-function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDeleteEmployee, notifTiming, onChangeNotifTiming }) {
+function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDeleteEmployee, notifTiming, onChangeNotifTiming, user }) {
   const [showForm, setShowForm] = useState(false);
   const blank = { firstName:"", lastName:"", email:"", phone:"", canViewSchedule:true, canEditShows:false, isAdmin:false };
-  const [newEmp, setNewEmp] = useState({ ...blank });
+  const [newEmp,   setNewEmp]   = useState({ ...blank });
+  const [inviting, setInviting] = useState({});   // { [empId]: true } while in-flight
   const { confirm, ConfirmDialog } = useConfirm();
+
+  async function handleInvite(emp) {
+    if (!emp.email) { alert("This employee has no email address on file."); return; }
+    setInviting(p => ({ ...p, [emp.id]: true }));
+    try {
+      // Create auth account with a random password so they can't guess it
+      const pw = crypto.randomUUID() + "Aa1!";
+      const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ email: emp.email, password: pw });
+      if (signUpData?.user && !signUpErr && user) {
+        // Link employee's auth account to the owner's data
+        await supabase.from("employee_links").upsert({
+          employee_auth_id:  signUpData.user.id,
+          owner_user_id:     user.id,
+          employee_record_id: emp.id,
+        }, { onConflict: "employee_auth_id" });
+      }
+      // Send "set your password" invite email
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(emp.email, {
+        redirectTo: "https://five-star-show-manager.vercel.app",
+      });
+      if (resetErr) throw resetErr;
+      onUpdateEmployee({ ...emp, inviteStatus:"invited", invitedAt: new Date().toISOString() });
+    } catch (e) {
+      alert("Could not send invite: " + (e.message || "Unknown error"));
+    } finally {
+      setInviting(p => ({ ...p, [emp.id]: false }));
+    }
+  }
 
   function handleAdd() {
     if (!newEmp.firstName || !newEmp.lastName || !newEmp.email) { alert("Please fill in First Name, Last Name, and Email."); return; }
@@ -499,6 +588,29 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
                   <Toggle value={emp.canViewSchedule} onChange={v => onUpdateEmployee({ ...emp, canViewSchedule:v })} label="Can View Their Schedule" />
                   <Toggle value={emp.canEditShows}    onChange={v => onUpdateEmployee({ ...emp, canEditShows:v })}    label="Can Edit Shows" />
                   <Toggle value={emp.isAdmin}         onChange={v => onUpdateEmployee({ ...emp, isAdmin:v })}         label="Administrator Access" />
+                </div>
+                {/* ── Portal invite ── */}
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:"#F9F7F4", borderRadius:10, padding:"12px 14px", marginBottom:16 }}>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#374151" }}>Portal Access</div>
+                    {emp.inviteStatus === "invited"
+                      ? <div style={{ fontSize:12, color:"#059669", marginTop:2 }}>✓ Invite sent{emp.invitedAt ? " · " + fmtDate(emp.invitedAt.split("T")[0]) : ""}</div>
+                      : <div style={{ fontSize:12, color:"#9CA3AF", marginTop:2 }}>Not yet invited</div>
+                    }
+                  </div>
+                  <button
+                    onClick={() => handleInvite(emp)}
+                    disabled={!!inviting[emp.id]}
+                    style={{
+                      background: emp.inviteStatus === "invited" ? "#F0FDF4" : "#1B3A5C",
+                      color:      emp.inviteStatus === "invited" ? "#059669" : "#fff",
+                      border:     emp.inviteStatus === "invited" ? "1px solid #6EE7B7" : "none",
+                      borderRadius:9, padding:"9px 14px", fontSize:13, fontWeight:700,
+                      cursor: inviting[emp.id] ? "wait" : "pointer",
+                      opacity: inviting[emp.id] ? 0.6 : 1, whiteSpace:"nowrap",
+                    }}>
+                    {inviting[emp.id] ? "Sending…" : emp.inviteStatus === "invited" ? "📧 Re-send" : "📧 Send Invite"}
+                  </button>
                 </div>
                 <div style={{ fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10 }}>Assigned Shows ({assigned.length})</div>
                 {assigned.length === 0
@@ -2239,8 +2351,8 @@ function PostShowSurvey({ show, employee, onSubmit, onClose }) {
 }
 
 // ─── Employee Portal ───────────────────────────────────────────────────────
-function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming }) {
-  const [selectedId, setSelectedId] = useState(null);
+function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, lockedEmployeeId }) {
+  const [selectedId, setSelectedId] = useState(lockedEmployeeId || null);
   const [surveyShow, setSurveyShow] = useState(null);
   const today = new Date(); today.setHours(0,0,0,0);
   const emp = employees.find(e => e.id === selectedId);
@@ -2274,7 +2386,10 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming }) {
   }
 
   const todayStr  = new Date().toISOString().split("T")[0];
-  const myShows   = shows.filter(s => (s.assignedEmployees||[]).includes(emp.id));
+  const myShows   = shows.filter(s =>
+    (s.assignedEmployees||[]).includes(emp.id) ||
+    (s.shifts||[]).some(sh => (sh.assignedEmployees||[]).includes(emp.id))
+  );
   const upcoming  = myShows.filter(s => s.status !== "complete" && s.date >= todayStr).sort((a,b) => a.date.localeCompare(b.date));
   const completed = myShows.filter(s => s.status === "complete").sort((a,b) => b.date.localeCompare(a.date));
   const notifications = myShows.filter(s => notifTiming==="assigned" ? s.status!=="complete" : s.status==="countdown");
@@ -2286,7 +2401,9 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming }) {
           <h1 style={{ fontSize:30, fontFamily:"'Playfair Display',serif", color:"#1B3A5C", margin:0 }}>Hi, {emp.firstName}! 👋</h1>
           <p style={{ color:"#6B7280", marginTop:5, fontSize:15 }}>Here are your show assignments.</p>
         </div>
-        <button onClick={() => setSelectedId(null)} style={{ background:"#F7F2EB", border:"1px solid #EDE6DC", borderRadius:9, padding:"9px 16px", fontSize:13, color:"#6B7280", cursor:"pointer", fontWeight:600 }}>← Switch</button>
+        {!lockedEmployeeId && (
+          <button onClick={() => setSelectedId(null)} style={{ background:"#F7F2EB", border:"1px solid #EDE6DC", borderRadius:9, padding:"9px 16px", fontSize:13, color:"#6B7280", cursor:"pointer", fontWeight:600 }}>← Switch</button>
+        )}
       </div>
       {notifications.length > 0 && (
         <div style={{ background:"#FFF1F2", border:"1px solid #FCA5A5", borderRadius:14, padding:"14px 18px", marginBottom:22, display:"flex", gap:12 }}>
@@ -2423,6 +2540,10 @@ export default function App() {
   const [notifTiming,   setNotifTiming]   = useState("countdown");
   const [editingName,   setEditingName]   = useState(false);
   const [nameInput,     setNameInput]     = useState("");
+  // Employee login
+  const [isEmployee,           setIsEmployee]           = useState(false);
+  const [employeeRecordId,     setEmployeeRecordId]     = useState(null);
+  const [showPasswordRecovery, setShowPasswordRecovery] = useState(false);
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -2430,8 +2551,14 @@ export default function App() {
       setUser(session?.user ?? null);
       setAuthLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
+      if (event === "PASSWORD_RECOVERY") {
+        setShowPasswordRecovery(true);
+      } else if (event === "USER_UPDATED") {
+        // Password successfully set — clear the recovery screen
+        setShowPasswordRecovery(false);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -2440,6 +2567,41 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     async function loadData() {
+      // Step 1: Check if this user is an employee
+      let empOwnerId = null;
+      try {
+        const { data: linkData } = await supabase
+          .from("employee_links")
+          .select("owner_user_id, employee_record_id")
+          .eq("employee_auth_id", user.id)
+          .maybeSingle();
+        if (linkData) {
+          empOwnerId = linkData.owner_user_id;
+          setIsEmployee(true);
+          setEmployeeRecordId(linkData.employee_record_id);
+        }
+      } catch(e) {}
+
+      // Step 2a: Employee — load the OWNER's data
+      if (empOwnerId) {
+        try {
+          const { data } = await supabase
+            .from("user_data")
+            .select("shows, employees, location_name, notif_timing")
+            .eq("id", empOwnerId)
+            .single();
+          if (data) {
+            if (data.shows)         setShows(data.shows.map(applyAutoStatus));
+            if (data.employees)     setEmployees(data.employees);
+            if (data.location_name) setLocationName(data.location_name);
+            if (data.notif_timing)  setNotifTiming(data.notif_timing);
+          }
+        } catch(e) {}
+        setLoaded(true);
+        return;
+      }
+
+      // Step 2b: Owner — load own data from Supabase
       try {
         const { data, error } = await supabase
           .from("user_data")
@@ -2454,7 +2616,8 @@ export default function App() {
           return;
         }
       } catch (e) {}
-      // Fallback: localStorage
+
+      // Step 2c: Fallback to localStorage
       try {
         const ver = localStorage.getItem("schema_version");
         if (!ver || ver !== "10") {
@@ -2478,7 +2641,7 @@ export default function App() {
 
   // ── Save data (debounced) ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!loaded || !user) return;
+    if (!loaded || !user || isEmployee) return;  // employees never write data
     const timer = setTimeout(() => {
       localStorage.setItem("shows_data",      JSON.stringify(shows));
       localStorage.setItem("employees_data",  JSON.stringify(employees));
@@ -2525,6 +2688,45 @@ export default function App() {
   );
 
   if (!user) return <LoginScreen />;
+
+  // ── Employee password-setup screen (after clicking invite link) ───────────
+  if (showPasswordRecovery) return <SetPasswordScreen />;
+
+  // ── Employee portal (restricted — no management UI) ───────────────────────
+  if (isEmployee) {
+    const empRecord = employees.find(e => e.id === employeeRecordId);
+    return (
+      <>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Nunito:wght@400;500;600;700&display=swap');
+          * { box-sizing:border-box; margin:0; padding:0; font-family:'Nunito',sans-serif; }
+          input:focus, select:focus { border-color:#1B3A5C !important; }
+        `}</style>
+        <div style={{ minHeight:"100vh", background:"#F7F2EB" }}>
+          <div style={{ background:"#1B3A5C", color:"#fff", padding:"14px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:"0 2px 12px rgba(0,0,0,0.15)" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+              <span style={{ fontSize:24 }}>⭐</span>
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, color:"#C4944A", textTransform:"uppercase", letterSpacing:"0.1em" }}>Five Star Show Manager</div>
+                {empRecord && <div style={{ fontSize:17, fontWeight:700 }}>{empRecord.firstName} {empRecord.lastName}</div>}
+              </div>
+            </div>
+            <button onClick={() => supabase.auth.signOut()}
+              style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.25)", borderRadius:9, padding:"9px 18px", color:"rgba(255,255,255,0.85)", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+              Sign Out
+            </button>
+          </div>
+          <EmployeePortalView
+            employees={employees}
+            shows={shows}
+            onUpdateShow={show => setShows(prev => prev.map(s => s.id===show.id ? show : s))}
+            notifTiming={notifTiming}
+            lockedEmployeeId={employeeRecordId}
+          />
+        </div>
+      </>
+    );
+  }
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -2613,7 +2815,7 @@ export default function App() {
             onUpdateEmployee={emp=>setEmployees(p=>p.map(e=>e.id===emp.id?emp:e))}
             onAddEmployee={emp=>setEmployees(p=>[...p,emp])}
             onDeleteEmployee={id=>setEmployees(p=>p.filter(e=>e.id!==id))}
-            notifTiming={notifTiming} onChangeNotifTiming={t=>setNotifTiming(t)} />}
+            notifTiming={notifTiming} onChangeNotifTiming={t=>setNotifTiming(t)} user={user} />}
           {view==="portal"    && <EmployeePortalView employees={employees} shows={shows} onUpdateShow={updateShow} notifTiming={notifTiming} />}
         </div>
       </div>
