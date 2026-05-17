@@ -1883,7 +1883,7 @@ function CalendarView({ shows, onViewShow }) {
             const dayShows = dateStr ? (showsByDate[dateStr] || []) : [];
             const isToday = dateStr === todayStr;
             return (
-              <div key={idx} style={{ minHeight:130, padding:"8px 7px",
+              <div key={idx} style={{ minHeight:150, padding:"8px 7px",
                 borderRight:(idx+1)%7===0 ? "none" : "1px solid #F5EDE3", borderBottom:"1px solid #F5EDE3",
                 background: !day ? "#FAFAF9" : isToday ? "#FBF7F0" : "#fff" }}>
                 {day && <>
@@ -1892,10 +1892,29 @@ function CalendarView({ shows, onViewShow }) {
                     fontWeight: isToday ? 700 : 500, fontSize:16 }}>{day}</div>
                   {dayShows.map(s => {
                     const st = STATUSES[s.status];
-                    return <div key={s.id} onClick={() => onViewShow(s)} title={s.name} style={{
-                      background:st.bg, border:"1px solid " + st.border, borderLeft:"3px solid " + st.dot,
-                      color:st.text, borderRadius:6, padding:"3px 6px", fontSize:12, fontWeight:700,
-                      marginBottom:3, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", cursor:"pointer" }}>{s.name}</div>;
+                    const empCount = getAssignedEmpIds(s).size;
+                    const checkItems = s.checklist || [];
+                    const checkDone = checkItems.filter(c => c.checked).length;
+                    return (
+                      <div key={s.id} onClick={() => onViewShow(s)} style={{
+                        background:st.bg, border:"1px solid " + st.border, borderLeft:"3px solid " + st.dot,
+                        borderRadius:8, padding:"5px 7px", marginBottom:4, cursor:"pointer" }}>
+                        <div style={{ fontSize:13, fontWeight:700, color:st.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", marginBottom:3 }}>{s.name}</div>
+                        {(s.startTime || s.endTime) && (
+                          <div style={{ fontSize:12, color:"#6B7280", marginBottom:3 }}>
+                            {s.startTime}{s.endTime ? "–" + s.endTime : ""}
+                          </div>
+                        )}
+                        <div style={{ display:"flex", flexWrap:"wrap", gap:3 }}>
+                          {s.boothSize && <span style={{ fontSize:11, background:"rgba(0,0,0,0.06)", color:"#6B7280", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>{s.boothSize}</span>}
+                          {empCount > 0 && <span style={{ fontSize:11, background:"#EFF6FF", color:"#1E40AF", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>👥{empCount}</span>}
+                          {s.hasElectrical && <span style={{ fontSize:11, background:"#FFFBEB", color:"#B45309", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>⚡</span>}
+                          {s.needsTrailer && <span style={{ fontSize:11, background:"#F0FDF4", color:"#166534", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>🚛</span>}
+                          {checkItems.length > 0 && <span style={{ fontSize:11, background:checkDone===checkItems.length?"#ECFDF5":"#FFF1F2", color:checkDone===checkItems.length?"#065F46":"#991B1B", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>✓{checkDone}/{checkItems.length}</span>}
+                          {s.rating && <span style={{ fontSize:11, background:"#FFFBEB", color:"#B45309", borderRadius:4, padding:"1px 5px", fontWeight:700 }}>{"★".repeat(s.rating)}</span>}
+                        </div>
+                      </div>
+                    );
                   })}
                 </>}
               </div>
