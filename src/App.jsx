@@ -456,7 +456,7 @@ function SetPasswordScreen() {
 }
 
 // ─── Employees View ────────────────────────────────────────────────────────
-function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDeleteEmployee, notifTiming, onChangeNotifTiming, user }) {
+function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDeleteEmployee, notifTiming, onChangeNotifTiming, user, onImmediateSave }) {
   const [showForm, setShowForm] = useState(false);
   const blank = { firstName:"", lastName:"", email:"", phone:"", canViewSchedule:true, canEditShows:false, isAdmin:false };
   const [newEmp,   setNewEmp]   = useState({ ...blank });
@@ -467,18 +467,30 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
     if (!emp.email) { alert("This employee has no email address on file."); return; }
     setInviting(p => ({ ...p, [emp.id]: true }));
     try {
-      // Create auth account with a random password so they can't guess it
+      // Try to create a new auth account
       const pw = crypto.randomUUID() + "Aa1!";
       const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ email: emp.email, password: pw });
+
       if (signUpData?.user && !signUpErr && user) {
-        // Link employee's auth account to the owner's data
+        // New user — link by auth UUID + email
         await supabase.from("employee_links").upsert({
-          employee_auth_id:  signUpData.user.id,
-          owner_user_id:     user.id,
+          employee_auth_id:   signUpData.user.id,
+          owner_user_id:      user.id,
           employee_record_id: emp.id,
+          employee_email:     emp.email,
+        }, { onConflict: "employee_auth_id" });
+      } else if (user) {
+        // User already exists — store by email so loadData can match on login
+        // We use a placeholder UUID for the primary key; it gets updated on first real login
+        await supabase.from("employee_links").upsert({
+          employee_auth_id:   "00000000-0000-0000-0000-" + String(emp.id).padStart(12, "0"),
+          owner_user_id:      user.id,
+          employee_record_id: emp.id,
+          employee_email:     emp.email,
         }, { onConflict: "employee_auth_id" });
       }
-      // Send "set your password" invite email
+
+      // Send "set / reset your password" invite email
       const { error: resetErr } = await supabase.auth.resetPasswordForEmail(emp.email, {
         redirectTo: "https://five-star-show-manager.vercel.app",
       });
@@ -496,7 +508,8 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
     const emp = { ...newEmp, id:genId() };
     onAddEmployee(emp);
     setNewEmp({ ...blank }); setShowForm(false);
-    // Automatically send invite after saving
+    // Save immediately to Supabase so the record exists before the invite link is clicked
+    if (onImmediateSave) await onImmediateSave(emp);
     await handleInvite(emp);
   }
   const inp = (label, key, type) => (
@@ -2355,10 +2368,10 @@ function PostShowSurvey({ show, employee, onSubmit, onClose }) {
 
 // ─── Employee Portal ───────────────────────────────────────────────────────
 function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, lockedEmployeeId }) {
-  const [selectedId, setSelectedId] = useState(lockedEmployeeId || null);
+  const [selectedId, setSelectedId] = useState(lockedEmployeeId ? Number(lockedEmployeeId) : null);
   const [surveyShow, setSurveyShow] = useState(null);
   const today = new Date(); today.setHours(0,0,0,0);
-  const emp = employees.find(e => e.id === selectedId);
+  const emp = employees.find(e => Number(e.id) === Number(selectedId));
 
   if (!emp) {
     return (
@@ -2570,18 +2583,39 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     async function loadData() {
-      // Step 1: Check if this user is an employee
+      // Step 1: Check if this user is an employee (by auth UUID, then by email)
       let empOwnerId = null;
       try {
-        const { data: linkData } = await supabase
+        let linkData = null;
+
+        // Primary check: match by auth UUID
+        const { data: byId } = await supabase
           .from("employee_links")
-          .select("owner_user_id, employee_record_id")
+          .select("owner_user_id, employee_record_id, employee_auth_id")
           .eq("employee_auth_id", user.id)
           .maybeSingle();
+        if (byId) { linkData = byId; }
+
+        // Fallback: match by email (covers existing-user invite case)
+        if (!linkData && user.email) {
+          const { data: byEmail } = await supabase
+            .from("employee_links")
+            .select("owner_user_id, employee_record_id, employee_auth_id")
+            .eq("employee_email", user.email)
+            .maybeSingle();
+          if (byEmail) {
+            linkData = byEmail;
+            // Upgrade the placeholder auth ID to the real one for future logins
+            await supabase.from("employee_links")
+              .update({ employee_auth_id: user.id })
+              .eq("employee_auth_id", byEmail.employee_auth_id);
+          }
+        }
+
         if (linkData) {
           empOwnerId = linkData.owner_user_id;
           setIsEmployee(true);
-          setEmployeeRecordId(linkData.employee_record_id);
+          setEmployeeRecordId(Number(linkData.employee_record_id));
         }
       } catch(e) {}
 
@@ -2818,7 +2852,14 @@ export default function App() {
             onUpdateEmployee={emp=>setEmployees(p=>p.map(e=>e.id===emp.id?emp:e))}
             onAddEmployee={emp=>setEmployees(p=>[...p,emp])}
             onDeleteEmployee={id=>setEmployees(p=>p.filter(e=>e.id!==id))}
-            notifTiming={notifTiming} onChangeNotifTiming={t=>setNotifTiming(t)} user={user} />}
+            notifTiming={notifTiming} onChangeNotifTiming={t=>setNotifTiming(t)} user={user}
+            onImmediateSave={async (newEmp) => {
+              const updated = [...employees, newEmp];
+              await supabase.from("user_data").upsert(
+                { owner_id:user.id, shows, employees:updated, location_name:locationName, notif_timing:notifTiming },
+                { onConflict:"owner_id" }
+              );
+            }} />}
           {view==="portal"    && <EmployeePortalView employees={employees} shows={shows} onUpdateShow={updateShow} notifTiming={notifTiming} />}
         </div>
       </div>
