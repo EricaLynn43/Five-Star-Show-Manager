@@ -97,6 +97,13 @@ function DEFAULT_INVENTORY() {
   ];
 }
 
+// Returns unique employee IDs assigned to a show — via direct assignment OR shift scheduler
+function getAssignedEmpIds(show) {
+  const ids = new Set(show.assignedEmployees || []);
+  (show.shifts || []).forEach(shift => (shift.assignedEmployees || []).forEach(id => ids.add(id)));
+  return ids;
+}
+
 function applyAutoStatus(show) {
   if (show.status === "complete") return show;
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -104,7 +111,7 @@ function applyAutoStatus(show) {
   const daysUntil = showDate ? Math.ceil((showDate - today) / (1000 * 60 * 60 * 24)) : 999;
   let s = { ...show };
   if (s.status === "lead" && (+s.depositPaid || 0) > 0) s.status = "booked";
-  if (s.status === "booked" && (s.assignedEmployees || []).length > 0) s.status = "preshow";
+  if (s.status === "booked" && getAssignedEmpIds(s).size > 0) s.status = "preshow";
   if (s.status === "preshow" && daysUntil <= 7 && daysUntil >= 0) {
     s.status = "countdown";
     if (!s.checklist || s.checklist.length === 0) s.checklist = DEFAULT_CHECKLIST();
@@ -1749,7 +1756,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
                           <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14 }}>{show.category}</td>
                           <td style={{ padding:"15px 18px" }}><StatusBadge status={show.status} /></td>
                           <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14 }}>{show.boothSize || "—"}</td>
-                          <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14 }}>{(show.assignedEmployees||[]).length}/{show.employeesNeeded||0}</td>
+                          <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14 }}>{getAssignedEmpIds(show).size}/{show.employeesNeeded||0}</td>
                           <td style={{ padding:"15px 18px", color:"#059669", fontWeight:700, fontSize:14 }}>{fmtMoney(show.depositPaid)}</td>
                           <td style={{ padding:"15px 18px", fontWeight:700, fontSize:14, color: balance > 0 ? "#DC2626" : "#059669" }}>{fmtMoney(balance)}</td>
                           <td style={{ padding:"15px 12px" }}>
@@ -1924,7 +1931,7 @@ function PipelineView({ shows, onUpdateShow, onViewShow }) {
                       )}
                       <div style={{ display:"flex", gap:8, marginTop:8, flexWrap:"wrap" }}>
                         {show.boothSize && <span style={{ fontSize:13, background:"#F3F4F6", color:"#6B7280", borderRadius:6, padding:"2px 7px", fontWeight:600 }}>{show.boothSize}</span>}
-                        {(show.assignedEmployees||[]).length > 0 && <span style={{ fontSize:13, background:"#EFF6FF", color:"#1E40AF", borderRadius:6, padding:"2px 7px", fontWeight:600 }}>👥 {show.assignedEmployees.length}</span>}
+                        {getAssignedEmpIds(show).size > 0 && <span style={{ fontSize:13, background:"#EFF6FF", color:"#1E40AF", borderRadius:6, padding:"2px 7px", fontWeight:600 }}>👥 {getAssignedEmpIds(show).size}</span>}
                         {checkTotal > 0 && <span style={{ fontSize:13, background:checkDone===checkTotal?"#ECFDF5":"#FFF1F2", color:checkDone===checkTotal?"#065F46":"#991B1B", borderRadius:6, padding:"2px 7px", fontWeight:600 }}>✓ {checkDone}/{checkTotal}</span>}
                         {show.rating && <span style={{ fontSize:13, background:"#FFFBEB", color:"#B45309", borderRadius:6, padding:"2px 7px", fontWeight:700 }}>{"★".repeat(show.rating)}</span>}
                       </div>
