@@ -491,10 +491,13 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
     }
   }
 
-  function handleAdd() {
+  async function handleAdd() {
     if (!newEmp.firstName || !newEmp.lastName || !newEmp.email) { alert("Please fill in First Name, Last Name, and Email."); return; }
-    onAddEmployee({ ...newEmp, id:genId() });
+    const emp = { ...newEmp, id:genId() };
+    onAddEmployee(emp);
     setNewEmp({ ...blank }); setShowForm(false);
+    // Automatically send invite after saving
+    await handleInvite(emp);
   }
   const inp = (label, key, type) => (
     <div>
@@ -553,7 +556,7 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
             <Toggle value={newEmp.isAdmin}         onChange={v => setNewEmp(p => ({ ...p, isAdmin:v }))}         label="Administrator" />
           </div>
           <div style={{ display:"flex", gap:12 }}>
-            <button onClick={handleAdd} style={{ background:"#1B3A5C", color:"#fff", border:"none", borderRadius:10, padding:"13px 28px", fontSize:15, fontWeight:700, cursor:"pointer" }}>Save Employee</button>
+            <button onClick={handleAdd} style={{ background:"#1B3A5C", color:"#fff", border:"none", borderRadius:10, padding:"13px 28px", fontSize:15, fontWeight:700, cursor:"pointer" }}>📧 Save & Send Invite</button>
             <button onClick={() => setShowForm(false)} style={{ background:"#F3F4F6", color:"#6B7280", border:"none", borderRadius:10, padding:"13px 24px", fontSize:15, cursor:"pointer", fontWeight:600 }}>Cancel</button>
           </div>
         </div>
