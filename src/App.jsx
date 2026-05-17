@@ -1409,10 +1409,252 @@ function DocumentsSection({ show, onUpdateShow, userId }) {
   );
 }
 
+// ─── Import Modal ──────────────────────────────────────────────────────────
+const IMPORT_FIELDS = [
+  { key:"name",         label:"Show Name",       aliases:["name","show name","event name","show","event","title"] },
+  { key:"date",         label:"Start Date",      aliases:["date","start date","show date","event date","start","begin"] },
+  { key:"endDate",      label:"End Date",        aliases:["end date","end","thru","through","finish"] },
+  { key:"startTime",    label:"Start Time",      aliases:["start time","open time","time","opens"] },
+  { key:"endTime",      label:"End Time",        aliases:["end time","close time","closes"] },
+  { key:"category",     label:"Category",        aliases:["category","type","event type","show type"] },
+  { key:"status",       label:"Status",          aliases:["status","stage"] },
+  { key:"street",       label:"Street Address",  aliases:["street","address","street address","addr"] },
+  { key:"city",         label:"City",            aliases:["city","town"] },
+  { key:"state",        label:"State",           aliases:["state","st","province"] },
+  { key:"zip",          label:"Zip Code",        aliases:["zip","zip code","postal","postal code"] },
+  { key:"contactName",  label:"Contact Name",    aliases:["contact","contact name","organizer","rep"] },
+  { key:"contactEmail", label:"Contact Email",   aliases:["email","contact email","e-mail"] },
+  { key:"contactPhone", label:"Contact Phone",   aliases:["phone","contact phone","telephone","cell"] },
+  { key:"totalDue",     label:"Total Show Cost", aliases:["cost","total cost","show cost","total due","price","fee","amount","total"] },
+  { key:"depositDue",   label:"Deposit Due",     aliases:["deposit","deposit due","deposit amount"] },
+  { key:"boothSize",    label:"Booth Size",      aliases:["booth","booth size","space size"] },
+  { key:"needToKnow",   label:"Notes",           aliases:["notes","need to know","comments","description","details","info"] },
+];
+
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n").filter(l => l.trim());
+  if (lines.length < 2) return { headers:[], rows:[] };
+  function parseRow(line) {
+    const result = []; let cur = ""; let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') { inQ = !inQ; }
+      else if (line[i] === "," && !inQ) { result.push(cur.trim()); cur = ""; }
+      else { cur += line[i]; }
+    }
+    result.push(cur.trim());
+    return result;
+  }
+  const headers = parseRow(lines[0]);
+  const rows = lines.slice(1).map(parseRow).filter(r => r.some(c => c));
+  return { headers, rows };
+}
+
+function parseImportDate(raw) {
+  if (!raw || !raw.trim()) return "";
+  const s = raw.trim();
+  // Already ISO
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // M/D/YYYY or MM/DD/YYYY or M/D/YY
+  const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (mdy) {
+    const y = mdy[3].length === 2 ? "20" + mdy[3] : mdy[3];
+    return `${y}-${mdy[1].padStart(2,"0")}-${mdy[2].padStart(2,"0")}`;
+  }
+  // Try native parse as fallback
+  const d = new Date(s);
+  if (!isNaN(d)) return d.toISOString().slice(0,10);
+  return "";
+}
+
+function normalizeStatus(raw) {
+  if (!raw) return "lead";
+  const s = raw.toLowerCase().trim();
+  if (s.includes("complete") || s.includes("done") || s.includes("finished")) return "complete";
+  if (s.includes("countdown") || s.includes("final")) return "countdown";
+  if (s.includes("pre") || s.includes("preshow")) return "preshow";
+  if (s.includes("book")) return "booked";
+  return "lead";
+}
+
+function autoMap(headers) {
+  const map = {};
+  headers.forEach((h, i) => {
+    const norm = h.toLowerCase().trim();
+    const field = IMPORT_FIELDS.find(f => f.aliases.includes(norm));
+    if (field && !Object.values(map).includes(i)) map[field.key] = i;
+  });
+  return map;
+}
+
+function ImportModal({ onImport, onClose }) {
+  const [step, setStep]       = useState("upload");
+  const [headers, setHeaders] = useState([]);
+  const [rows, setRows]       = useState([]);
+  const [mapping, setMapping] = useState({});
+  const [error, setError]     = useState("");
+  const fileRef = useRef(null);
+
+  function handleFile(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const { headers: h, rows: r } = parseCSV(ev.target.result);
+      if (h.length === 0 || r.length === 0) { setError("Could not read this file. Make sure it's a valid CSV with a header row."); return; }
+      setHeaders(h); setRows(r); setMapping(autoMap(h)); setError(""); setStep("map");
+    };
+    reader.readAsText(file);
+  }
+
+  function doImport() {
+    const imported = rows.map(row => {
+      const get = key => { const i = mapping[key]; return i !== undefined && i !== "" ? (row[i] || "").trim() : ""; };
+      return {
+        ...{ name:"", date:"", endDate:"", startTime:"", endTime:"", category:"", status:"lead",
+             street:"", city:"", state:"", zip:"", contactName:"", contactEmail:"", contactPhone:"",
+             boothSize:"", totalDue:"", depositDue:"", needToKnow:"",
+             assignedEmployees:[], employeeReports:[], inventory:[], checklist:[], communications:[], documents:[], shifts:[], rating:null, ratingNotes:"" },
+        id: genId(),
+        name:         get("name"),
+        date:         parseImportDate(get("date")),
+        endDate:      parseImportDate(get("endDate")),
+        startTime:    get("startTime"),
+        endTime:      get("endTime"),
+        category:     get("category"),
+        status:       normalizeStatus(get("status")),
+        street:       get("street"),
+        city:         get("city"),
+        state:        get("state"),
+        zip:          get("zip"),
+        contactName:  get("contactName"),
+        contactEmail: get("contactEmail"),
+        contactPhone: get("contactPhone"),
+        boothSize:    get("boothSize"),
+        totalDue:     get("totalDue").replace(/[$,]/g,""),
+        depositDue:   get("depositDue").replace(/[$,]/g,""),
+        needToKnow:   get("needToKnow"),
+      };
+    }).filter(s => s.name);
+    if (imported.length === 0) { setError("No valid shows found. Make sure the Show Name column is mapped."); return; }
+    onImport(imported);
+    onClose();
+  }
+
+  const mappedCount = Object.keys(mapping).length;
+  const nameIsMapped = "name" in mapping;
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.55)", zIndex:1100, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background:"#fff", borderRadius:20, width:"100%", maxWidth:700, maxHeight:"90vh", display:"flex", flexDirection:"column", boxShadow:"0 20px 60px rgba(0,0,0,0.25)", overflow:"hidden" }}>
+        {/* Header */}
+        <div style={{ background:"#1B3A5C", padding:"22px 28px", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <div>
+            <h2 style={{ margin:0, color:"#fff", fontFamily:"'Playfair Display',serif", fontSize:22 }}>📥 Import Shows</h2>
+            <p style={{ margin:"4px 0 0", color:"rgba(255,255,255,0.7)", fontSize:14 }}>From Google Sheets, Excel, or any CSV file</p>
+          </div>
+          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", fontSize:22, cursor:"pointer", borderRadius:"50%", width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center" }}>×</button>
+        </div>
+
+        <div style={{ padding:"24px 28px", overflowY:"auto", flex:1 }}>
+          {step === "upload" && (
+            <div>
+              <div style={{ background:"#F7F2EB", border:"2px dashed #C4944A", borderRadius:16, padding:"40px 24px", textAlign:"center", marginBottom:20, cursor:"pointer" }}
+                onClick={() => fileRef.current && fileRef.current.click()}>
+                <div style={{ fontSize:48, marginBottom:12 }}>📂</div>
+                <p style={{ fontSize:18, fontWeight:700, color:"#1B3A5C", margin:"0 0 8px" }}>Click to choose your file</p>
+                <p style={{ fontSize:15, color:"#6B7280", margin:0 }}>Accepts .csv files (export from Google Sheets or Excel)</p>
+              </div>
+              <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display:"none" }} onChange={handleFile} />
+
+              <div style={{ background:"#EFF6FF", border:"1px solid #93C5FD", borderRadius:12, padding:"16px 20px" }}>
+                <p style={{ margin:"0 0 10px", fontWeight:700, fontSize:15, color:"#1E40AF" }}>💡 How to export from Google Sheets or Excel:</p>
+                <ul style={{ margin:0, paddingLeft:20, color:"#374151", fontSize:15, lineHeight:2 }}>
+                  <li><b>Google Sheets:</b> File → Download → Comma Separated Values (.csv)</li>
+                  <li><b>Excel:</b> File → Save As → CSV (Comma delimited) (.csv)</li>
+                </ul>
+                <p style={{ margin:"10px 0 0", fontSize:14, color:"#6B7280" }}>
+                  The app will automatically detect your column headers — no exact naming required.
+                </p>
+              </div>
+              {error && <p style={{ color:"#DC2626", marginTop:16, fontWeight:600, fontSize:15 }}>{error}</p>}
+            </div>
+          )}
+
+          {step === "map" && (
+            <div>
+              <p style={{ margin:"0 0 6px", fontSize:15, color:"#374151" }}>
+                Found <b>{rows.length} rows</b> with <b>{headers.length} columns</b>. We auto-matched <b>{mappedCount} of {IMPORT_FIELDS.length}</b> fields — check and adjust below.
+              </p>
+              <p style={{ margin:"0 0 18px", fontSize:14, color:"#6B7280" }}>
+                Only <b>Show Name</b> is required. Leave others as "— Skip —" if not in your file.
+              </p>
+
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:20 }}>
+                {IMPORT_FIELDS.map(field => (
+                  <div key={field.key}>
+                    <label style={{ fontSize:13, fontWeight:700, color:"#374151", display:"block", marginBottom:4 }}>
+                      {field.label}{field.key === "name" ? <span style={{ color:"#DC2626" }}> *</span> : ""}
+                    </label>
+                    <select
+                      value={mapping[field.key] !== undefined ? mapping[field.key] : ""}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setMapping(m => { const n = {...m}; if (val === "") delete n[field.key]; else n[field.key] = +val; return n; });
+                      }}
+                      style={{ width:"100%", padding:"9px 12px", borderRadius:8, border:"2px solid " + (field.key === "name" && !nameIsMapped ? "#FCA5A5" : "#EDE6DC"), fontSize:14, color:"#1F2937", background:"#fff", outline:"none" }}>
+                      <option value="">— Skip —</option>
+                      {headers.map((h, i) => <option key={i} value={i}>{h} {rows[0]?.[i] ? `(e.g. "${rows[0][i]}")` : ""}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              {/* Preview */}
+              <div style={{ background:"#F7F2EB", borderRadius:12, padding:"16px 18px", marginBottom:4 }}>
+                <p style={{ margin:"0 0 10px", fontWeight:700, fontSize:14, color:"#1B3A5C" }}>Preview (first 3 rows)</p>
+                {rows.slice(0,3).map((row, ri) => {
+                  const name  = mapping.name  !== undefined ? row[mapping.name]  : "—";
+                  const date  = mapping.date  !== undefined ? parseImportDate(row[mapping.date])  : "";
+                  const city  = mapping.city  !== undefined ? row[mapping.city]  : "";
+                  const state = mapping.state !== undefined ? row[mapping.state] : "";
+                  return (
+                    <div key={ri} style={{ background:"#fff", borderRadius:8, padding:"10px 14px", marginBottom:6, fontSize:14, color:"#374151" }}>
+                      <b style={{ color:"#1B3A5C" }}>{name || "—"}</b>
+                      {date && <span style={{ color:"#6B7280", marginLeft:10 }}>📅 {fmtDate(date)}</span>}
+                      {(city || state) && <span style={{ color:"#6B7280", marginLeft:10 }}>📍 {[city, state].filter(Boolean).join(", ")}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+              {error && <p style={{ color:"#DC2626", marginTop:12, fontWeight:600, fontSize:15 }}>{error}</p>}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:"18px 28px", borderTop:"1px solid #EDE6DC", display:"flex", gap:12, justifyContent:"flex-end", background:"#FAFAF9" }}>
+          {step === "upload" && (
+            <button onClick={onClose} style={{ padding:"12px 24px", borderRadius:10, border:"2px solid #EDE6DC", background:"#fff", color:"#6B7280", fontSize:15, cursor:"pointer", fontWeight:600 }}>Cancel</button>
+          )}
+          {step === "map" && (<>
+            <button onClick={() => { setStep("upload"); setError(""); }} style={{ padding:"12px 24px", borderRadius:10, border:"2px solid #EDE6DC", background:"#fff", color:"#6B7280", fontSize:15, cursor:"pointer", fontWeight:600 }}>← Back</button>
+            <button onClick={doImport} disabled={!nameIsMapped}
+              style={{ padding:"12px 28px", borderRadius:10, border:"none", background: nameIsMapped ? "#1B3A5C" : "#9CA3AF", color:"#fff", fontSize:15, cursor: nameIsMapped ? "pointer" : "not-allowed", fontWeight:700 }}>
+              Import {rows.length} Show{rows.length !== 1 ? "s" : ""} →
+            </button>
+          </>)}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Shows List (isMobile is now properly included in props) ───────────────
-function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, isMobile }) {
+function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportShows, isMobile }) {
   const [filterStatus, setFilterStatus] = useState("all");
   const [search, setSearch] = useState("");
+  const [showImport, setShowImport] = useState(false);
   const filtered = shows.filter(s => {
     const ms = filterStatus === "all" || s.status === filterStatus;
     const mt = s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -1427,9 +1669,14 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, isMobile })
           <p style={{ color:"#6B7280", marginTop:6, fontSize:17 }}>{shows.length} show{shows.length !== 1 ? "s" : ""} in your program</p>
         </div>
         {!isMobile && (
-          <button onClick={onAddShow} style={{ background:"#1B3A5C", color:"#fff", border:"none", borderRadius:12, padding:"14px 26px", fontSize:16, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:8 }}>
-            <span style={{ fontSize:22, lineHeight:1 }}>+</span> Add New Show
-          </button>
+          <div style={{ display:"flex", gap:10 }}>
+            <button onClick={() => setShowImport(true)} style={{ background:"#fff", color:"#1B3A5C", border:"2px solid #1B3A5C", borderRadius:12, padding:"14px 22px", fontSize:16, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:8 }}>
+              📥 Import
+            </button>
+            <button onClick={onAddShow} style={{ background:"#1B3A5C", color:"#fff", border:"none", borderRadius:12, padding:"14px 26px", fontSize:16, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:8 }}>
+              <span style={{ fontSize:22, lineHeight:1 }}>+</span> Add New Show
+            </button>
+          </div>
         )}
       </div>
       <div style={{ display:"flex", gap:12, marginBottom:22, flexWrap:"wrap", alignItems:"center" }}>
@@ -1517,6 +1764,12 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, isMobile })
             </table>
           </div>
         </div>
+      )}
+      {showImport && (
+        <ImportModal
+          onImport={imported => { onImportShows(imported); setShowImport(false); }}
+          onClose={() => setShowImport(false)}
+        />
       )}
     </div>
   );
@@ -2270,7 +2523,7 @@ export default function App() {
         {/* ── Main content ── */}
         <div style={{ flex:1, overflowY:"auto", paddingBottom:isMobile?"72px":0 }}>
           {view==="dashboard" && <DashboardView shows={shows} setView={setView} onAddShow={openAdd} onViewShow={s=>setViewing(s)} isMobile={isMobile} />}
-          {view==="shows"     && <ShowsListView shows={shows} onAddShow={openAdd} onViewShow={s=>setViewing(s)} onDeleteShow={id=>setShows(p=>p.filter(s=>s.id!==id))} isMobile={isMobile} />}
+          {view==="shows"     && <ShowsListView shows={shows} onAddShow={openAdd} onViewShow={s=>setViewing(s)} onDeleteShow={id=>setShows(p=>p.filter(s=>s.id!==id))} onImportShows={imported=>setShows(p=>[...p,...imported])} isMobile={isMobile} />}
           {view==="pipeline"  && <PipelineView shows={shows} onUpdateShow={updateShow} onViewShow={s=>setViewing(s)} />}
           {view==="reports"   && <ReportsView shows={shows} isMobile={isMobile} />}
           {view==="calendar"  && <CalendarView shows={shows} onViewShow={s=>setViewing(s)} />}
