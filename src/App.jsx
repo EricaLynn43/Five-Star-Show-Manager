@@ -2588,7 +2588,7 @@ export default function App() {
           const { data } = await supabase
             .from("user_data")
             .select("shows, employees, location_name, notif_timing")
-            .eq("id", empOwnerId)
+            .eq("owner_id", empOwnerId)
             .single();
           if (data) {
             if (data.shows)         setShows(data.shows.map(applyAutoStatus));
@@ -2648,8 +2648,8 @@ export default function App() {
       localStorage.setItem("location_name",   locationName);
       localStorage.setItem("notif_timing",    notifTiming);
       supabase.from("user_data").upsert(
-        { id:user.id, shows, employees, location_name:locationName, notif_timing:notifTiming },
-        { onConflict:"id" }
+        { owner_id:user.id, shows, employees, location_name:locationName, notif_timing:notifTiming },
+        { onConflict:"owner_id" }
       );
     }, 800);
     return () => clearTimeout(timer);
