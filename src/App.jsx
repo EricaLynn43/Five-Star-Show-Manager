@@ -180,6 +180,50 @@ const SAMPLE_EMPLOYEES = [
 ];
 
 // ─── Small reusable components ─────────────────────────────────────────────
+// ─── Confirm Modal + Hook ──────────────────────────────────────────────────
+function ConfirmModal({ message, subtext, confirmLabel, cancelLabel, danger, onConfirm, onCancel }) {
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.6)", zIndex:3000, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}
+      onClick={e => e.target === e.currentTarget && onCancel()}>
+      <div style={{ background:"#fff", borderRadius:20, padding:"32px 36px", maxWidth:420, width:"100%", boxShadow:"0 24px 64px rgba(0,0,0,0.25)", textAlign:"center" }}>
+        <div style={{ fontSize:44, marginBottom:14 }}>{danger ? "🗑️" : "💬"}</div>
+        <p style={{ fontSize:18, color:"#1F2937", fontWeight:700, margin:"0 0 8px", lineHeight:1.4 }}>{message}</p>
+        {subtext && <p style={{ fontSize:14, color:"#6B7280", margin:"0 0 24px" }}>{subtext}</p>}
+        {!subtext && <div style={{ marginBottom:24 }} />}
+        <div style={{ display:"flex", gap:12, justifyContent:"center" }}>
+          <button onClick={onCancel}
+            style={{ padding:"13px 28px", borderRadius:12, border:"2px solid #EDE6DC", background:"#fff", color:"#6B7280", fontSize:16, fontWeight:700, cursor:"pointer", minWidth:110 }}>
+            {cancelLabel || "Cancel"}
+          </button>
+          <button onClick={onConfirm}
+            style={{ padding:"13px 28px", borderRadius:12, border:"none", background:danger?"#DC2626":"#1B3A5C", color:"#fff", fontSize:16, fontWeight:700, cursor:"pointer", minWidth:110 }}>
+            {confirmLabel || "OK"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function useConfirm() {
+  const [state, setState] = useState(null);
+  function confirm(message, opts = {}) {
+    return new Promise(resolve => setState({ message, resolve, ...opts }));
+  }
+  const dialog = state ? (
+    <ConfirmModal
+      message={state.message}
+      subtext={state.subtext}
+      confirmLabel={state.confirmLabel}
+      cancelLabel={state.cancelLabel}
+      danger={state.danger}
+      onConfirm={() => { state.resolve(true);  setState(null); }}
+      onCancel={()  => { state.resolve(false); setState(null); }}
+    />
+  ) : null;
+  return { confirm, ConfirmDialog: dialog };
+}
+
 function StatusBadge({ status, large }) {
   const s = STATUSES[status];
   if (!s) return null;
@@ -356,6 +400,7 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
   const [showForm, setShowForm] = useState(false);
   const blank = { firstName:"", lastName:"", email:"", phone:"", canViewSchedule:true, canEditShows:false, isAdmin:false };
   const [newEmp, setNewEmp] = useState({ ...blank });
+  const { confirm, ConfirmDialog } = useConfirm();
 
   function handleAdd() {
     if (!newEmp.firstName || !newEmp.lastName || !newEmp.email) { alert("Please fill in First Name, Last Name, and Email."); return; }
@@ -443,7 +488,7 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
                     <div style={{ color:"#6B7280", fontSize:14 }}>{emp.phone}</div>
                   </div>
                 </div>
-                <button onClick={() => { if (window.confirm("Remove " + emp.firstName + " " + emp.lastName + "?")) onDeleteEmployee(emp.id); }}
+                <button onClick={async () => { if (await confirm(`Remove ${emp.firstName} ${emp.lastName}?`, { subtext:"This will unassign them from all shows.", danger:true, confirmLabel:"Remove" })) onDeleteEmployee(emp.id); }}
                   style={{ background:"none", border:"none", color:"#D1D5DB", fontSize:24, cursor:"pointer", lineHeight:1, padding:4 }}
                   onMouseEnter={e => e.currentTarget.style.color="#EF4444"}
                   onMouseLeave={e => e.currentTarget.style.color="#D1D5DB"}>×</button>
@@ -470,6 +515,7 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
           );
         })}
       </div>
+      {ConfirmDialog}
     </div>
   );
 }
@@ -840,6 +886,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
   const [addingComm, setAddingComm] = useState(false);
   const [commType,   setCommType]   = useState("call");
   const [commNote,   setCommNote]   = useState("");
+  const { confirm, ConfirmDialog } = useConfirm();
 
   function saveComm() {
     if (!commNote.trim()) { alert("Please add a note about what was covered."); return; }
@@ -847,8 +894,8 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
     onUpdateShow({ ...show, communications:[entry, ...comms] });
     setCommNote(""); setCommType("call"); setAddingComm(false);
   }
-  function deleteComm(id) {
-    if (!window.confirm("Remove this communication entry?")) return;
+  async function deleteComm(id) {
+    if (!await confirm("Remove this communication entry?", { danger:true, confirmLabel:"Remove" })) return;
     onUpdateShow({ ...show, communications:comms.filter(c => c.id !== id) });
   }
 
@@ -1113,6 +1160,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
           </div>
         </div>
       </div>
+      {ConfirmDialog}
     </div>
   );
 }
@@ -1123,6 +1171,7 @@ function ShiftScheduler({ show, employees, onUpdateShow }) {
   const [shiftHours, setShiftHours] = useState(4);
   const [peoplePerShift, setPeoplePerShift] = useState(2);
   const [assigningId, setAssigningId] = useState(null);
+  const { confirm, ConfirmDialog } = useConfirm();
 
   function getShowDates() {
     if (!show.date) return [];
@@ -1142,7 +1191,7 @@ function ShiftScheduler({ show, employees, onUpdateShow }) {
     return m ? `${h12}:${String(m).padStart(2,"0")}${ampm}` : `${h12}${ampm}`;
   }
 
-  function generateShifts() {
+  async function generateShifts() {
     if (!show.startTime || !show.endTime) {
       alert("Please set a Start Time and End Time on the show first (Edit Show).");
       return;
@@ -1162,7 +1211,7 @@ function ShiftScheduler({ show, employees, onUpdateShow }) {
         cursor += shiftMins;
       }
     }
-    if (shifts.length > 0 && !window.confirm(`Replace the existing ${shifts.length} shift(s) with ${newShifts.length} new shift(s)?`)) return;
+    if (shifts.length > 0 && !await confirm(`Replace ${shifts.length} existing shift(s) with ${newShifts.length} new shift(s)?`, { confirmLabel:"Regenerate", danger:true })) return;
     onUpdateShow({ ...show, shifts: newShifts });
     setAssigningId(null);
   }
@@ -1175,8 +1224,8 @@ function ShiftScheduler({ show, employees, onUpdateShow }) {
     })});
   }
 
-  function deleteShifts() {
-    if (!window.confirm("Remove all shifts for this show?")) return;
+  async function deleteShifts() {
+    if (!await confirm("Remove all shifts for this show?", { danger:true, confirmLabel:"Remove All" })) return;
     onUpdateShow({ ...show, shifts: [] });
     setAssigningId(null);
   }
@@ -1322,6 +1371,7 @@ function ShiftScheduler({ show, employees, onUpdateShow }) {
           )}
         </div>
       )}
+      {ConfirmDialog}
     </div>
   );
 }
@@ -1331,6 +1381,7 @@ function DocumentsSection({ show, onUpdateShow, userId }) {
   const docs = show.documents || [];
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
+  const { confirm, ConfirmDialog } = useConfirm();
 
   async function handleUpload(e) {
     const file = e.target.files[0];
@@ -1358,7 +1409,7 @@ function DocumentsSection({ show, onUpdateShow, userId }) {
   }
 
   async function handleDelete(doc) {
-    if (!window.confirm(`Delete "${doc.name}"?`)) return;
+    if (!await confirm(`Delete "${doc.name}"?`, { danger:true, confirmLabel:"Delete", subtext:"This cannot be undone." })) return;
     await supabase.storage.from("show-documents").remove([doc.path]);
     onUpdateShow({ ...show, documents: docs.filter(d => d.id !== doc.id) });
   }
@@ -1412,6 +1463,7 @@ function DocumentsSection({ show, onUpdateShow, userId }) {
           </div>
         ))
       }
+      {ConfirmDialog}
     </div>
   );
 }
@@ -1662,6 +1714,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
   const [filterStatus, setFilterStatus] = useState("all");
   const [search, setSearch] = useState("");
   const [showImport, setShowImport] = useState(false);
+  const { confirm, ConfirmDialog } = useConfirm();
   const filtered = shows.filter(s => {
     const ms = filterStatus === "all" || s.status === filterStatus;
     const mt = s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -1760,7 +1813,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
                           <td style={{ padding:"15px 18px", color:"#059669", fontWeight:700, fontSize:14 }}>{fmtMoney(show.depositPaid)}</td>
                           <td style={{ padding:"15px 18px", fontWeight:700, fontSize:14, color: balance > 0 ? "#DC2626" : "#059669" }}>{fmtMoney(balance)}</td>
                           <td style={{ padding:"15px 12px" }}>
-                            <button onClick={e => { e.stopPropagation(); if (window.confirm("Delete \"" + show.name + "\"? This cannot be undone.")) onDeleteShow(show.id); }}
+                            <button onClick={async e => { e.stopPropagation(); if (await confirm(`Delete "${show.name}"?`, { danger:true, confirmLabel:"Delete", subtext:"This cannot be undone." })) onDeleteShow(show.id); }}
                               style={{ background:"#FEF2F2", color:"#DC2626", border:"1px solid #FECACA", borderRadius:8, padding:"6px 12px", fontSize:13, cursor:"pointer", fontWeight:600 }}>Delete</button>
                           </td>
                         </tr>
@@ -1778,6 +1831,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
           onClose={() => setShowImport(false)}
         />
       )}
+      {ConfirmDialog}
     </div>
   );
 }
@@ -1932,6 +1986,8 @@ function PipelineView({ shows, onUpdateShow, onViewShow }) {
                       <div style={{ display:"flex", gap:8, marginTop:8, flexWrap:"wrap" }}>
                         {show.boothSize && <span style={{ fontSize:13, background:"#F3F4F6", color:"#6B7280", borderRadius:6, padding:"2px 7px", fontWeight:600 }}>{show.boothSize}</span>}
                         {getAssignedEmpIds(show).size > 0 && <span style={{ fontSize:13, background:"#EFF6FF", color:"#1E40AF", borderRadius:6, padding:"2px 7px", fontWeight:600 }}>👥 {getAssignedEmpIds(show).size}</span>}
+                        {show.hasElectrical && <span style={{ fontSize:13, background:"#FFFBEB", color:"#B45309", borderRadius:6, padding:"2px 7px", fontWeight:600 }} title="Electrical available">⚡ Electrical</span>}
+                        {show.needsTrailer && <span style={{ fontSize:13, background:"#F0FDF4", color:"#166534", borderRadius:6, padding:"2px 7px", fontWeight:600 }} title="Trailer needed">🚛 Trailer</span>}
                         {checkTotal > 0 && <span style={{ fontSize:13, background:checkDone===checkTotal?"#ECFDF5":"#FFF1F2", color:checkDone===checkTotal?"#065F46":"#991B1B", borderRadius:6, padding:"2px 7px", fontWeight:600 }}>✓ {checkDone}/{checkTotal}</span>}
                         {show.rating && <span style={{ fontSize:13, background:"#FFFBEB", color:"#B45309", borderRadius:6, padding:"2px 7px", fontWeight:700 }}>{"★".repeat(show.rating)}</span>}
                       </div>
