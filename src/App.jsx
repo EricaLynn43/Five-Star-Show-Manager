@@ -430,7 +430,7 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
                   <div>
                     <div style={{ fontWeight:700, fontSize:18, color:"#1F2937" }}>
                       {emp.firstName} {emp.lastName}
-                      {emp.isAdmin && <span style={{ marginLeft:8, fontSize:11, background:"#C4944A", color:"#fff", borderRadius:10, padding:"2px 9px", verticalAlign:"middle" }}>Admin</span>}
+                      {emp.isAdmin && <span style={{ marginLeft:8, fontSize:13, background:"#C4944A", color:"#fff", borderRadius:10, padding:"2px 9px", verticalAlign:"middle" }}>Admin</span>}
                     </div>
                     <div style={{ color:"#6B7280", fontSize:14, marginTop:2 }}>{emp.email}</div>
                     <div style={{ color:"#6B7280", fontSize:14 }}>{emp.phone}</div>
@@ -442,13 +442,13 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
                   onMouseLeave={e => e.currentTarget.style.color="#D1D5DB"}>×</button>
               </div>
               <div style={{ padding:"18px 24px" }}>
-                <div style={{ fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:12 }}>App Permissions</div>
+                <div style={{ fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:12 }}>App Permissions</div>
                 <div style={{ display:"flex", flexDirection:"column", gap:11, marginBottom:18 }}>
                   <Toggle value={emp.canViewSchedule} onChange={v => onUpdateEmployee({ ...emp, canViewSchedule:v })} label="Can View Their Schedule" />
                   <Toggle value={emp.canEditShows}    onChange={v => onUpdateEmployee({ ...emp, canEditShows:v })}    label="Can Edit Shows" />
                   <Toggle value={emp.isAdmin}         onChange={v => onUpdateEmployee({ ...emp, isAdmin:v })}         label="Administrator Access" />
                 </div>
-                <div style={{ fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10 }}>Assigned Shows ({assigned.length})</div>
+                <div style={{ fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10 }}>Assigned Shows ({assigned.length})</div>
                 {assigned.length === 0
                   ? <span style={{ fontSize:14, color:"#9CA3AF" }}>No shows assigned yet</span>
                   : assigned.map(s => (
@@ -524,7 +524,7 @@ function CalendarPicker({ value, onChange, label, required }) {
             <button onClick={nextMonth} style={{ background:"none", border:"none", fontSize:20, cursor:"pointer", color:"#1B3A5C", fontWeight:700, padding:"4px 10px" }}>›</button>
           </div>
           <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:2, textAlign:"center" }}>
-            {DAYS.map(d => <div key={d} style={{ fontSize:11, fontWeight:700, color:"#9CA3AF", padding:"4px 0" }}>{d}</div>)}
+            {DAYS.map(d => <div key={d} style={{ fontSize:13, fontWeight:700, color:"#9CA3AF", padding:"4px 0" }}>{d}</div>)}
             {Array.from({ length: firstWeekday }).map((_, i) => <div key={`b${i}`} />)}
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
@@ -763,7 +763,7 @@ function InventorySection({ show, onUpdateShow }) {
   return (
     <div style={{ marginTop:20, paddingTop:20, borderTop:"2px solid #F0E8DF" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
-        <p style={{ margin:0, fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>
+        <p style={{ margin:0, fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>
           📦 Packing List{items.length > 0 ? " (" + packedCount + "/" + items.length + " packed)" : ""}
         </p>
         <div style={{ display:"flex", gap:8 }}>
@@ -855,7 +855,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"11px 0", borderBottom:"1px solid #F5EDE3" }}>
       <span style={{ fontSize:15, color:"#6B7280", fontWeight:500 }}>{label}</span>
       <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-        {date && <span style={{ fontSize:12, fontWeight:600, color:"#9CA3AF", background:"#F3F4F6", borderRadius:6, padding:"3px 8px", whiteSpace:"nowrap" }}>📅 {fmtDateRange(date, show.endDate)}</span>}
+        {date && <span style={{ fontSize:13, fontWeight:600, color:"#6B7280", background:"#F3F4F6", borderRadius:6, padding:"3px 8px", whiteSpace:"nowrap" }}>📅 {fmtDate(date)}</span>}
         <span style={{ fontSize:15, color:accent||"#1F2937", fontWeight:700 }}>{amount || "—"}</span>
       </div>
     </div>
@@ -875,7 +875,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
           <button onClick={onClose} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", fontSize:22, cursor:"pointer", borderRadius:"50%", width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>×</button>
         </div>
         <div style={{ padding:28 }}>
-          <p style={{ margin:"0 0 4px", fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Show Details</p>
+          <p style={{ margin:"0 0 4px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Show Details</p>
           <Row label="Date" value={fmtDateRange(show.date, show.endDate)} />
           <Row label="Time" value={show.startTime && show.endTime ? show.startTime + " – " + show.endTime : null} />
           <Row label="Category" value={show.category} />
@@ -904,12 +904,12 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
           <Row label="Electrical" value={show.hasElectrical ? "Yes" : "No"} />
           <Row label="Trailer" value={show.needsTrailer ? "Yes" : "No"} />
 
-          <p style={{ margin:"20px 0 4px", fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Contact</p>
+          <p style={{ margin:"20px 0 4px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Contact</p>
           <Row label="Name" value={show.contactName} />
           <Row label="Email" value={show.contactEmail} />
           <Row label="Phone" value={show.contactPhone} />
 
-          <p style={{ margin:"20px 0 4px", fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Financials</p>
+          <p style={{ margin:"20px 0 4px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Financials</p>
           <FinRow label="Total Show Cost"       amount={fmtMoney(show.totalDue)}   date={show.finalPaymentDueDate} />
           <FinRow label="Deposit Due"           amount={fmtMoney(show.depositDue)} date={show.depositDueDate} />
           <FinRow label="Deposit Paid"          amount={fmtMoney(show.depositPaid)} date={show.depositPaidDate} accent="#059669" />
@@ -921,11 +921,11 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
           <InventorySection show={show} onUpdateShow={onUpdateShow} />
 
           {(+show.contactsCollected || 0) > 0 && <>
-            <p style={{ margin:"20px 0 4px", fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Show Results</p>
+            <p style={{ margin:"20px 0 4px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Show Results</p>
             <Row label="Contacts Collected" value={(+show.contactsCollected).toLocaleString()} accent="#1B3A5C" />
           </>}
 
-          <p style={{ margin:"20px 0 12px", fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>
+          <p style={{ margin:"20px 0 12px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>
             Staff Assigned ({assigned.length} of {show.employeesNeeded || 0} needed)
           </p>
           {assigned.length === 0
@@ -943,7 +943,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
 
           {show.needToKnow && (
             <div style={{ marginTop:20, paddingTop:20, borderTop:"2px solid #F0E8DF" }}>
-              <p style={{ margin:"0 0 10px", fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>📌 Need to Know</p>
+              <p style={{ margin:"0 0 10px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>📌 Need to Know</p>
               <div style={{ background:"#FFFBEB", border:"1px solid #FCD34D", borderLeft:"4px solid #F59E0B", borderRadius:10, padding:"14px 16px" }}>
                 <p style={{ margin:0, fontSize:15, color:"#1F2937", lineHeight:1.6, whiteSpace:"pre-wrap" }}>{show.needToKnow}</p>
               </div>
@@ -956,15 +956,15 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
             const totalAppts = reports.reduce((a,r) => a + (+r.appointmentsBooked||0), 0);
             return (
               <div style={{ marginTop:20, paddingTop:20, borderTop:"2px solid #F0E8DF" }}>
-                <p style={{ margin:"0 0 12px", fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Employee Reports ({reports.length})</p>
+                <p style={{ margin:"0 0 12px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Employee Reports ({reports.length})</p>
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
                   <div style={{ background:"#EFF6FF", borderRadius:10, padding:"12px 16px" }}>
                     <div style={{ fontSize:22, fontWeight:700, color:"#1E40AF", fontFamily:"'Playfair Display',serif" }}>{totalLeads}</div>
-                    <div style={{ fontSize:12, color:"#6B7280", marginTop:2 }}>Total Contacts</div>
+                    <div style={{ fontSize:14, color:"#6B7280", marginTop:2 }}>Total Contacts</div>
                   </div>
                   <div style={{ background:"#ECFDF5", borderRadius:10, padding:"12px 16px" }}>
                     <div style={{ fontSize:22, fontWeight:700, color:"#059669", fontFamily:"'Playfair Display',serif" }}>{totalAppts}</div>
-                    <div style={{ fontSize:12, color:"#6B7280", marginTop:2 }}>Appointments Booked</div>
+                    <div style={{ fontSize:14, color:"#6B7280", marginTop:2 }}>Appointments Booked</div>
                   </div>
                 </div>
                 {reports.map(r => (
@@ -1018,7 +1018,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
 
           {show.status === "complete" && (
             <div style={{ marginTop:20, paddingTop:20, borderTop:"2px solid #F0E8DF" }}>
-              <p style={{ margin:"0 0 12px", fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>⭐ Show Rating</p>
+              <p style={{ margin:"0 0 12px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>⭐ Show Rating</p>
               <StarRating value={show.rating} onChange={r => onUpdateShow({ ...show, rating:r })} size={34} />
               {show.rating && (
                 <textarea value={show.ratingNotes || ""} rows={2} onChange={e => onUpdateShow({ ...show, ratingNotes:e.target.value })}
@@ -1034,7 +1034,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
 
           <div style={{ marginTop:20, paddingTop:22, borderTop:"2px solid #F0E8DF" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-              <p style={{ margin:0, fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Communication Log ({comms.length})</p>
+              <p style={{ margin:0, fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Communication Log ({comms.length})</p>
               {!addingComm && (
                 <button onClick={() => setAddingComm(true)} style={{ background:"#1B3A5C", color:"#fff", border:"none", borderRadius:20, padding:"8px 18px", fontSize:14, fontWeight:700, cursor:"pointer" }}>
                   + Log Communication
@@ -1186,7 +1186,7 @@ function ShiftScheduler({ show, employees, onUpdateShow }) {
   return (
     <div style={{ marginTop:20, paddingTop:20, borderTop:"2px solid #F0E8DF" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-        <p style={{ margin:0, fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>
+        <p style={{ margin:0, fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>
           Shift Schedule {shifts.length > 0 && `(${shifts.length} shifts)`}
         </p>
         {shifts.length > 0 && (
@@ -1257,7 +1257,7 @@ function ShiftScheduler({ show, employees, onUpdateShow }) {
                         <span style={{ fontSize:13, fontWeight:700, color: isSel ? "#fff" : "#1B3A5C" }}>
                           {fmt12(shift.startTime)} – {fmt12(shift.endTime)}
                         </span>
-                        <span style={{ fontSize:11, fontWeight:700, borderRadius:20, padding:"2px 8px",
+                        <span style={{ fontSize:13, fontWeight:700, borderRadius:20, padding:"2px 8px",
                           background: isSel?"rgba(255,255,255,0.2)": full?"#D1FAE5": filled>0?"#FEF3C7":"#F3F4F6",
                           color: isSel?"#fff": full?"#065F46": filled>0?"#92400E":"#6B7280" }}>
                           {filled}/{needed}
@@ -1375,7 +1375,7 @@ function DocumentsSection({ show, onUpdateShow, userId }) {
   return (
     <div style={{ marginTop:20, paddingTop:20, borderTop:"2px solid #F0E8DF" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:14 }}>
-        <p style={{ margin:0, fontSize:12, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>
+        <p style={{ margin:0, fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>
           Documents ({docs.length})
         </p>
         <button onClick={() => fileRef.current && fileRef.current.click()} disabled={uploading}
@@ -1392,7 +1392,7 @@ function DocumentsSection({ show, onUpdateShow, userId }) {
             <span style={{ fontSize:24, flexShrink:0 }}>{fileIcon(doc.type)}</span>
             <div style={{ flex:1, minWidth:0 }}>
               <div style={{ fontWeight:700, fontSize:14, color:"#1F2937", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{doc.name}</div>
-              <div style={{ fontSize:12, color:"#9CA3AF", marginTop:2 }}>{formatSize(doc.size)} · {fmtDate(doc.uploadedAt?.slice(0,10))}</div>
+              <div style={{ fontSize:14, color:"#6B7280", marginTop:2 }}>{formatSize(doc.size)} · {fmtDate(doc.uploadedAt?.slice(0,10))}</div>
             </div>
             <button onClick={() => openDoc(doc)}
               style={{ padding:"6px 14px", borderRadius:8, background:"#EFF6FF", border:"1px solid #93C5FD", color:"#1D4ED8", fontWeight:700, fontSize:13, cursor:"pointer", whiteSpace:"nowrap", flexShrink:0 }}>
@@ -1483,7 +1483,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, isMobile })
               <thead>
                 <tr style={{ background:"#F7F2EB", borderBottom:"2px solid #EDE6DC" }}>
                   {["Show Name","Date","Category","Status","Booth","Staff","Deposit Paid","Balance",""].map((h, i) => (
-                    <th key={i} style={{ padding:"14px 18px", textAlign:"left", fontSize:12, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>{h}</th>
+                    <th key={i} style={{ padding:"14px 18px", textAlign:"left", fontSize:14, fontWeight:700, color:"#4B5563", textTransform:"uppercase", letterSpacing:"0.05em", whiteSpace:"nowrap" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1670,10 +1670,10 @@ function PipelineView({ shows, onUpdateShow, onViewShow }) {
                         </div>
                       )}
                       <div style={{ display:"flex", gap:8, marginTop:8, flexWrap:"wrap" }}>
-                        {show.boothSize && <span style={{ fontSize:11, background:"#F3F4F6", color:"#6B7280", borderRadius:6, padding:"2px 7px", fontWeight:600 }}>{show.boothSize}</span>}
-                        {(show.assignedEmployees||[]).length > 0 && <span style={{ fontSize:11, background:"#EFF6FF", color:"#1E40AF", borderRadius:6, padding:"2px 7px", fontWeight:600 }}>👥 {show.assignedEmployees.length}</span>}
-                        {checkTotal > 0 && <span style={{ fontSize:11, background:checkDone===checkTotal?"#ECFDF5":"#FFF1F2", color:checkDone===checkTotal?"#065F46":"#991B1B", borderRadius:6, padding:"2px 7px", fontWeight:600 }}>✓ {checkDone}/{checkTotal}</span>}
-                        {show.rating && <span style={{ fontSize:11, background:"#FFFBEB", color:"#B45309", borderRadius:6, padding:"2px 7px", fontWeight:700 }}>{"★".repeat(show.rating)}</span>}
+                        {show.boothSize && <span style={{ fontSize:13, background:"#F3F4F6", color:"#6B7280", borderRadius:6, padding:"2px 7px", fontWeight:600 }}>{show.boothSize}</span>}
+                        {(show.assignedEmployees||[]).length > 0 && <span style={{ fontSize:13, background:"#EFF6FF", color:"#1E40AF", borderRadius:6, padding:"2px 7px", fontWeight:600 }}>👥 {show.assignedEmployees.length}</span>}
+                        {checkTotal > 0 && <span style={{ fontSize:13, background:checkDone===checkTotal?"#ECFDF5":"#FFF1F2", color:checkDone===checkTotal?"#065F46":"#991B1B", borderRadius:6, padding:"2px 7px", fontWeight:600 }}>✓ {checkDone}/{checkTotal}</span>}
+                        {show.rating && <span style={{ fontSize:13, background:"#FFFBEB", color:"#B45309", borderRadius:6, padding:"2px 7px", fontWeight:700 }}>{"★".repeat(show.rating)}</span>}
                       </div>
                     </div>
                   );
@@ -1771,11 +1771,11 @@ function ReportsView({ shows, isMobile }) {
       </div>
       <div style={{ display:"grid", gridTemplateColumns:isMobile?"repeat(2,1fr)":"repeat(3,1fr)", gap:12, marginBottom:24 }}>
         {kpis.map((k, i) => (
-          <div key={i} style={{ background:"#fff", borderRadius:16, padding:"20px 18px", border:"1px solid #EDE6DC", boxShadow:"0 2px 8px rgba(0,0,0,0.04)" }}>
-            <div style={{ fontSize:28, marginBottom:8 }}>{k.icon}</div>
-            <div style={{ fontSize:22, fontWeight:700, color:k.color, fontFamily:"'Playfair Display',serif", lineHeight:1.1, marginBottom:4 }}>{k.value}</div>
-            <div style={{ fontSize:13, fontWeight:700, color:"#374151", marginBottom:3 }}>{k.label}</div>
-            <div style={{ fontSize:11, color:"#9CA3AF" }}>{k.sub}</div>
+          <div key={i} style={{ background:"#fff", borderRadius:16, padding:"20px 18px", border:"2px solid #EDE6DC", boxShadow:"0 2px 8px rgba(0,0,0,0.06)" }}>
+            <div style={{ fontSize:30, marginBottom:8 }}>{k.icon}</div>
+            <div style={{ fontSize:24, fontWeight:700, color:k.color, fontFamily:"'Playfair Display',serif", lineHeight:1.1, marginBottom:4 }}>{k.value}</div>
+            <div style={{ fontSize:15, fontWeight:700, color:"#1F2937", marginBottom:4 }}>{k.label}</div>
+            <div style={{ fontSize:13, color:"#6B7280", fontWeight:500 }}>{k.sub}</div>
           </div>
         ))}
       </div>
@@ -1816,7 +1816,7 @@ function ReportsView({ shows, isMobile }) {
             <thead>
               <tr style={{ background:"#F7F2EB", borderBottom:"2px solid #EDE6DC" }}>
                 {["Show","City","Date","Category","Status","Contacts","Show Cost","Cost / Contact"].map((h,i)=>(
-                  <th key={i} style={{ padding:"12px 18px", textAlign:"left", fontSize:11, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>{h}</th>
+                  <th key={i} style={{ padding:"12px 18px", textAlign:"left", fontSize:14, fontWeight:700, color:"#4B5563", textTransform:"uppercase", letterSpacing:"0.05em", whiteSpace:"nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -1987,7 +1987,7 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming }) {
                 </div>
                 <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
                   <div style={{ background:"#F7F2EB", borderRadius:9, padding:"10px 14px" }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:3 }}>Date</div>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:3 }}>Date</div>
                     <div style={{ fontSize:15, fontWeight:700, color:"#1F2937" }}>{fmtDateRange(show.date, show.endDate)}</div>
                     {daysUntil >= 0 && daysUntil <= 30 && (
                       <div style={{ fontSize:12, fontWeight:700, marginTop:3, color:daysUntil<=3?"#DC2626":daysUntil<=7?"#D97706":"#059669" }}>
@@ -1996,14 +1996,14 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming }) {
                     )}
                   </div>
                   <div style={{ background:"#F7F2EB", borderRadius:9, padding:"10px 14px" }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:3 }}>Time</div>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:3 }}>Time</div>
                     <div style={{ fontSize:15, fontWeight:700, color:"#1F2937" }}>{show.startTime||"TBD"} – {show.endTime||"TBD"}</div>
                   </div>
                 </div>
                 {mapsAddr && (
                   <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:"#EFF6FF", borderRadius:9, padding:"10px 14px", marginBottom:10 }}>
                     <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", marginBottom:2 }}>Location</div>
+                      <div style={{ fontSize:13, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", marginBottom:2 }}>Location</div>
                       <div style={{ fontSize:13, color:"#374151", fontWeight:600, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{mapsAddr}</div>
                     </div>
                     {mapsUrl && <a href={mapsUrl} target="_blank" rel="noreferrer"
@@ -2014,7 +2014,7 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming }) {
                 )}
                 {show.needToKnow && (
                   <div style={{ background:"#FFFBEB", border:"1px solid #FCD34D", borderLeft:"4px solid #F59E0B", borderRadius:9, padding:"11px 14px", marginBottom:10 }}>
-                    <div style={{ fontSize:11, fontWeight:700, color:"#B45309", textTransform:"uppercase", marginBottom:5 }}>📌 Need to Know</div>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#B45309", textTransform:"uppercase", marginBottom:5 }}>📌 Need to Know</div>
                     <p style={{ margin:0, fontSize:14, color:"#1F2937", lineHeight:1.55, whiteSpace:"pre-wrap" }}>{show.needToKnow}</p>
                   </div>
                 )}
@@ -2046,8 +2046,8 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming }) {
                 {report
                   ? <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:3 }}>
                       <span style={{ fontSize:22 }}>✅</span>
-                      <span style={{ fontSize:11, color:"#059669", fontWeight:700 }}>Submitted</span>
-                      <button onClick={() => setSurveyShow(show)} style={{ fontSize:11, color:"#9CA3AF", background:"none", border:"none", cursor:"pointer", textDecoration:"underline" }}>Edit</button>
+                      <span style={{ fontSize:13, color:"#059669", fontWeight:700 }}>Submitted</span>
+                      <button onClick={() => setSurveyShow(show)} style={{ fontSize:13, color:"#9CA3AF", background:"none", border:"none", cursor:"pointer", textDecoration:"underline" }}>Edit</button>
                     </div>
                   : <button onClick={() => setSurveyShow(show)} style={{ background:"#1B3A5C", color:"#fff", border:"none", borderRadius:10, padding:"11px 16px", fontSize:13, fontWeight:700, cursor:"pointer", whiteSpace:"nowrap" }}>
                       📋 File Report
@@ -2209,7 +2209,7 @@ export default function App() {
         {!isMobile && (
           <div style={{ width:238, background:"#1B3A5C", color:"#fff", display:"flex", flexDirection:"column", flexShrink:0, overflowY:"auto" }}>
             <div style={{ padding:"26px 22px 18px", borderBottom:"1px solid rgba(255,255,255,0.1)" }}>
-              <div style={{ fontSize:11, fontWeight:700, color:"#C4944A", textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:5 }}>Show Manager</div>
+              <div style={{ fontSize:13, fontWeight:700, color:"#C4944A", textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:5 }}>Show Manager</div>
               {editingName ? (
                 <div>
                   <input autoFocus value={nameInput} onChange={e => setNameInput(e.target.value)}
@@ -2223,7 +2223,7 @@ export default function App() {
                       if (e.key === "Escape") setEditingName(false);
                     }}
                     style={{ width:"100%", background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.3)", borderRadius:6, padding:"6px 8px", color:"#fff", fontSize:14, fontFamily:"'Nunito',sans-serif", outline:"none", boxSizing:"border-box" }} />
-                  <div style={{ fontSize:11, color:"rgba(255,255,255,0.45)", marginTop:4 }}>Enter to save · Esc to cancel</div>
+                  <div style={{ fontSize:13, color:"rgba(255,255,255,0.45)", marginTop:4 }}>Enter to save · Esc to cancel</div>
                 </div>
               ) : (
                 <div style={{ display:"flex", alignItems:"flex-start", gap:6, cursor:"pointer" }}
@@ -2319,10 +2319,10 @@ function DashboardView({ shows, setView, onAddShow, onViewShow, isMobile }) {
       </div>
       <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap:16, marginBottom:28 }}>
         {stats.map((s, i) => (
-          <div key={i} style={{ background:"#fff", borderRadius:18, padding:"26px 22px", border:"1px solid #EDE6DC", boxShadow:"0 2px 10px rgba(0,0,0,0.04)" }}>
-            <div style={{ fontSize:34, marginBottom:10 }}>{s.icon}</div>
-            <div style={{ fontSize:30, fontWeight:700, color:s.color, fontFamily:"'Playfair Display',serif" }}>{s.value}</div>
-            <div style={{ fontSize:14, color:"#6B7280", marginTop:5, fontWeight:500 }}>{s.label}</div>
+          <div key={i} style={{ background:"#fff", borderRadius:18, padding:"26px 22px", border:"2px solid #EDE6DC", boxShadow:"0 2px 12px rgba(0,0,0,0.07)" }}>
+            <div style={{ fontSize:36, marginBottom:10 }}>{s.icon}</div>
+            <div style={{ fontSize:34, fontWeight:700, color:s.color, fontFamily:"'Playfair Display',serif" }}>{s.value}</div>
+            <div style={{ fontSize:16, color:"#374151", marginTop:6, fontWeight:700 }}>{s.label}</div>
           </div>
         ))}
       </div>
@@ -2354,12 +2354,12 @@ function DashboardView({ shows, setView, onAddShow, onViewShow, isMobile }) {
             {STATUS_ORDER.map(k => {
               const s = STATUSES[k], count = shows.filter(sh => sh.status === k).length;
               return (
-                <div key={k} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:12 }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:9 }}>
-                    <div style={{ width:11, height:11, borderRadius:"50%", background:s.dot, flexShrink:0 }} />
-                    <span style={{ fontSize:14, color:"#374151" }}>{s.label}</span>
+                <div key={k} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+                    <div style={{ width:14, height:14, borderRadius:"50%", background:s.dot, flexShrink:0 }} />
+                    <span style={{ fontSize:15, color:"#1F2937", fontWeight:600 }}>{s.label}</span>
                   </div>
-                  <span style={{ fontSize:14, fontWeight:700, color:"#6B7280" }}>{count}</span>
+                  <span style={{ fontSize:15, fontWeight:700, color:"#1B3A5C" }}>{count}</span>
                 </div>
               );
             })}
