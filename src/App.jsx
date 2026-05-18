@@ -2379,11 +2379,15 @@ function PostShowSurvey({ show, employee, onSubmit, onClose }) {
 }
 
 // ─── Employee Portal ───────────────────────────────────────────────────────
-function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, lockedEmployeeId }) {
+function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, lockedEmployeeId, userEmail }) {
   const [selectedId, setSelectedId] = useState(lockedEmployeeId ? Number(lockedEmployeeId) : null);
   const [surveyShow, setSurveyShow] = useState(null);
   const today = new Date(); today.setHours(0,0,0,0);
-  const emp = employees.find(e => Number(e.id) === Number(selectedId));
+  // Match by ID first; fall back to email for locked employees (handles ID mismatch after re-invite)
+  const emp = lockedEmployeeId
+    ? (employees.find(e => Number(e.id) === Number(selectedId)) ||
+       employees.find(e => e.email?.toLowerCase() === userEmail?.toLowerCase()))
+    : employees.find(e => Number(e.id) === Number(selectedId));
 
   if (!emp) {
     // Logged in as a specific employee but record not found in data yet
@@ -2797,6 +2801,7 @@ export default function App() {
             onUpdateShow={show => setShows(prev => prev.map(s => s.id===show.id ? show : s))}
             notifTiming={notifTiming}
             lockedEmployeeId={employeeRecordId}
+            userEmail={user?.email}
           />
         </div>
       </>
