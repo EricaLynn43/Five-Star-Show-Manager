@@ -2386,6 +2386,23 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
   const emp = employees.find(e => Number(e.id) === Number(selectedId));
 
   if (!emp) {
+    // Logged in as a specific employee but record not found in data yet
+    if (lockedEmployeeId) {
+      return (
+        <div style={{ padding:"60px 20px", display:"flex", flexDirection:"column", alignItems:"center", textAlign:"center" }}>
+          <div style={{ fontSize:52, marginBottom:16 }}>⏳</div>
+          <h2 style={{ fontFamily:"'Playfair Display',serif", color:"#1B3A5C", fontSize:28, margin:"0 0 12px" }}>Almost there!</h2>
+          <p style={{ color:"#6B7280", fontSize:16, maxWidth:360, lineHeight:1.6 }}>
+            Your profile is still being set up. Please ask your manager to make sure you're added in the <strong>Employees</strong> tab, then sign out and back in.
+          </p>
+          <button onClick={() => supabase.auth.signOut()}
+            style={{ marginTop:28, background:"#1B3A5C", color:"#fff", border:"none", borderRadius:10, padding:"13px 28px", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+            Sign Out
+          </button>
+        </div>
+      );
+    }
+    // Management UI portal — show employee picker
     return (
       <div style={{ padding:"60px 20px", display:"flex", flexDirection:"column", alignItems:"center" }}>
         <div style={{ fontSize:52, marginBottom:16 }}>👋</div>
