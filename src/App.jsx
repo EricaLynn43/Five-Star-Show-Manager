@@ -472,7 +472,7 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
       const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ email: emp.email, password: pw });
 
       if (signUpData?.user && !signUpErr && user) {
-        // New user — link by auth UUID + email
+        // New user — link by real auth UUID + email
         await supabase.from("employee_links").upsert({
           employee_auth_id:   signUpData.user.id,
           owner_user_id:      user.id,
@@ -480,14 +480,26 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
           employee_email:     emp.email,
         }, { onConflict: "employee_auth_id" });
       } else if (user) {
-        // User already exists — store by email so loadData can match on login
-        // We use a placeholder UUID for the primary key; it gets updated on first real login
-        await supabase.from("employee_links").upsert({
-          employee_auth_id:   "00000000-0000-0000-0000-" + String(emp.id).padStart(12, "0"),
-          owner_user_id:      user.id,
-          employee_record_id: emp.id,
-          employee_email:     emp.email,
-        }, { onConflict: "employee_auth_id" });
+        // User already exists in Supabase — check if a row exists for this email
+        const { data: existing } = await supabase
+          .from("employee_links")
+          .select("employee_auth_id")
+          .eq("employee_email", emp.email)
+          .maybeSingle();
+        if (existing) {
+          // Update the existing row with the latest record ID
+          await supabase.from("employee_links")
+            .update({ employee_record_id: emp.id, owner_user_id: user.id })
+            .eq("employee_email", emp.email);
+        } else {
+          // Insert a new row with a valid placeholder UUID
+          await supabase.from("employee_links").insert({
+            employee_auth_id:   crypto.randomUUID(),
+            owner_user_id:      user.id,
+            employee_record_id: emp.id,
+            employee_email:     emp.email,
+          });
+        }
       }
 
       // Send "set / reset your password" invite email
@@ -2612,7 +2624,8 @@ export default function App() {
           }
         }
 
-        if (linkData) {
+        // Only route as employee if the owner is someone ELSE (not themselves)
+        if (linkData && linkData.owner_user_id !== user.id) {
           empOwnerId = linkData.owner_user_id;
           setIsEmployee(true);
           setEmployeeRecordId(Number(linkData.employee_record_id));
