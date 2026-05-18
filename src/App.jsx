@@ -2597,6 +2597,7 @@ export default function App() {
     async function loadData() {
       // Step 1: Check if this user is an employee (by auth UUID, then by email)
       let empOwnerId = null;
+      let empRecordId = null;
       try {
         let linkData = null;
 
@@ -2626,9 +2627,10 @@ export default function App() {
 
         // Only route as employee if the owner is someone ELSE (not themselves)
         if (linkData && linkData.owner_user_id !== user.id) {
-          empOwnerId = linkData.owner_user_id;
+          empOwnerId  = linkData.owner_user_id;
+          empRecordId = Number(linkData.employee_record_id);
           setIsEmployee(true);
-          setEmployeeRecordId(Number(linkData.employee_record_id));
+          setEmployeeRecordId(empRecordId);
         }
       } catch(e) {}
 
@@ -2641,10 +2643,16 @@ export default function App() {
             .eq("owner_id", empOwnerId)
             .single();
           if (data) {
-            if (data.shows)         setShows(data.shows.map(applyAutoStatus));
-            if (data.employees)     setEmployees(data.employees);
+            const loadedEmployees = data.employees || [];
+            if (data.shows) setShows(data.shows.map(applyAutoStatus));
+            setEmployees(loadedEmployees);
             if (data.location_name) setLocationName(data.location_name);
             if (data.notif_timing)  setNotifTiming(data.notif_timing);
+            // Match employee record by ID first, then fall back to email
+            const byId    = loadedEmployees.find(e => Number(e.id) === Number(empRecordId));
+            const byEmail = loadedEmployees.find(e => e.email?.toLowerCase() === user.email?.toLowerCase());
+            const matched = byId || byEmail;
+            if (matched) setEmployeeRecordId(matched.id);
           }
         } catch(e) {}
         setLoaded(true);
