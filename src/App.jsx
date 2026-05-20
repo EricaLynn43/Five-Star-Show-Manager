@@ -1087,6 +1087,34 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
           </div>
           <button onClick={onClose} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", fontSize:22, cursor:"pointer", borderRadius:"50%", width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>×</button>
         </div>
+        {/* ── Show Lifecycle bar ── */}
+        {(() => {
+          const todayStr = new Date().toISOString().split("T")[0];
+          const loadInDay = show.loadInDate || show.date;
+          const canStart = !show.showActive && !show.closedAt && loadInDay && todayStr >= loadInDay;
+          const canClose = show.showActive;
+          if (!canStart && !canClose) return null;
+          return (
+            <div style={{ background: canClose ? "#ECFDF5" : "#FFF7ED", borderBottom:"1px solid " + (canClose ? "#6EE7B7" : "#FCD34D"), padding:"14px 28px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
+              <div>
+                {canClose
+                  ? <><span style={{ fontSize:16 }}>🟢</span> <strong style={{ color:"#065F46" }}>Show is LIVE</strong> <span style={{ fontSize:13, color:"#6B7280", marginLeft:6 }}>— {show.leadCount||0} leads · {show.appointmentCount||0} appts</span></>
+                  : <><span style={{ fontSize:16 }}>📋</span> <strong style={{ color:"#92400E" }}>Ready to start</strong> <span style={{ fontSize:13, color:"#6B7280", marginLeft:6 }}>Load-in day has arrived!</span></>
+                }
+              </div>
+              {canClose
+                ? <button onClick={() => onUpdateShow({ ...show, showActive:false, closedAt:new Date().toISOString() })}
+                    style={{ background:"#DC2626", color:"#fff", border:"none", borderRadius:9, padding:"9px 18px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+                    🔴 Close Show
+                  </button>
+                : <button onClick={() => onUpdateShow({ ...show, showActive:true, startedAt:new Date().toISOString() })}
+                    style={{ background:"#059669", color:"#fff", border:"none", borderRadius:9, padding:"9px 18px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+                    🟢 Start Show
+                  </button>
+              }
+            </div>
+          );
+        })()}
         <div style={{ padding:28 }}>
           <p style={{ margin:"0 0 4px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Show Details</p>
           <Row label="Date" value={fmtDateRange(show.date, show.endDate)} />
@@ -2514,7 +2542,7 @@ async function smAddLead({ firstName, lastName, phone, email, address, city, sta
 }
 
 // ─── Lead Form Modal ───────────────────────────────────────────────────────
-function LeadFormModal({ show, emp, onClose }) {
+function LeadFormModal({ show, emp, onClose, onLeadAdded }) {
   const blank = { firstName:"", lastName:"", phone:"", email:"", address:"", city:"", state:"", zip:"", staffNotes:"" };
   const [form, setForm] = useState({ ...blank });
   const [saving, setSaving] = useState(false);
@@ -2539,6 +2567,7 @@ function LeadFormModal({ show, emp, onClose }) {
       if (result.ResultCode === 0) {
         setSuccess(true);
         setForm({ ...blank });
+        if (onLeadAdded) onLeadAdded();
       } else {
         setError(result.Message || "Something went wrong. Please try again.");
       }
@@ -2570,15 +2599,20 @@ function LeadFormModal({ show, emp, onClose }) {
               <div style={{ fontSize:52, marginBottom:12 }}>🎉</div>
               <h3 style={{ fontFamily:"'Playfair Display',serif", color:"#1B3A5C", fontSize:22, margin:"0 0 8px" }}>Lead Added!</h3>
               <p style={{ color:"#6B7280", fontSize:15, marginBottom:24 }}>Contact has been added to Serviceminder.</p>
-              <div style={{ display:"flex", gap:10 }}>
-                <button onClick={() => setSuccess(false)}
-                  style={{ flex:1, padding:"13px", borderRadius:10, border:"2px solid #1B3A5C", background:"#fff", color:"#1B3A5C", fontSize:15, fontWeight:700, cursor:"pointer" }}>
-                  + Add Another
+              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                <button style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background:"#059669", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+                  📅 Book Appointment
                 </button>
-                <button onClick={onClose}
-                  style={{ flex:1, padding:"13px", borderRadius:10, border:"none", background:"#1B3A5C", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>
-                  Done
-                </button>
+                <div style={{ display:"flex", gap:10 }}>
+                  <button onClick={() => setSuccess(false)}
+                    style={{ flex:1, padding:"13px", borderRadius:10, border:"2px solid #1B3A5C", background:"#fff", color:"#1B3A5C", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+                    + Add Another
+                  </button>
+                  <button onClick={onClose}
+                    style={{ flex:1, padding:"13px", borderRadius:10, border:"none", background:"#1B3A5C", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+                    Done
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
@@ -2654,6 +2688,7 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
   const [selectedId, setSelectedId] = useState(lockedEmployeeId ? Number(lockedEmployeeId) : null);
   const [surveyShow, setSurveyShow] = useState(null);
   const [leadShow,   setLeadShow]   = useState(null);
+  const [leadCounts, setLeadCounts] = useState({});  // { [showId]: count } — session only
   const today = new Date(); today.setHours(0,0,0,0);
   // Match by ID first; fall back to email for locked employees (handles ID mismatch after re-invite)
   const emp = lockedEmployeeId
@@ -2797,6 +2832,16 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
                     {teammates.map(t => <span key={t.id} style={{ fontSize:12, background:"#F3F4F6", color:"#374151", borderRadius:10, padding:"3px 10px", fontWeight:600 }}>{t.firstName} {t.lastName}</span>)}
                   </div>
                 )}
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
+                  <div style={{ display:"flex", gap:10 }}>
+                    <div style={{ background:"#EFF6FF", borderRadius:8, padding:"6px 12px", fontSize:13, fontWeight:700, color:"#1E40AF" }}>
+                      {(show.leadCount||0) + (leadCounts[show.id]||0)} Leads
+                    </div>
+                    <div style={{ background:"#ECFDF5", borderRadius:8, padding:"6px 12px", fontSize:13, fontWeight:700, color:"#059669" }}>
+                      {show.appointmentCount||0} Appts
+                    </div>
+                  </div>
+                </div>
                 <button onClick={() => setLeadShow(show)}
                   style={{ width:"100%", padding:"11px", borderRadius:10, border:"2px solid #C4944A", background:"#FFFBF5", color:"#C4944A", fontSize:14, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:7 }}>
                   ➕ Add Lead
@@ -2835,7 +2880,8 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
           })
       }
       {surveyShow && <PostShowSurvey show={surveyShow} employee={emp} onSubmit={s=>{onUpdateShow(s);setSurveyShow(null);}} onClose={()=>setSurveyShow(null)} />}
-      {leadShow   && <LeadFormModal show={leadShow} emp={emp} onClose={() => setLeadShow(null)} />}
+      {leadShow   && <LeadFormModal show={leadShow} emp={emp} onClose={() => setLeadShow(null)}
+                      onLeadAdded={() => setLeadCounts(p => ({ ...p, [leadShow.id]: (p[leadShow.id]||0) + 1 }))} />}
     </div>
   );
 }
@@ -3247,6 +3293,7 @@ export default function App() {
 // ─── Dashboard ─────────────────────────────────────────────────────────────
 function DashboardView({ shows, setView, onAddShow, onViewShow, isMobile }) {
   const today = new Date().toISOString().split("T")[0];
+  const activeShows = shows.filter(s => s.showActive);
   const upcoming = shows.filter(s => s.date >= today && s.status !== "complete")
     .sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
   const stats = [
@@ -3261,6 +3308,31 @@ function DashboardView({ shows, setView, onAddShow, onViewShow, isMobile }) {
         <h1 style={{ fontSize:34, fontFamily:"'Playfair Display',serif", color:"#1B3A5C", margin:0 }}>Welcome Back, Kathy! 👋</h1>
         <p style={{ color:"#6B7280", marginTop:6, fontSize:17 }}>Here's your shows & events program at a glance.</p>
       </div>
+      {activeShows.length > 0 && (
+        <div style={{ marginBottom:28 }}>
+          <h2 style={{ fontSize:20, fontFamily:"'Playfair Display',serif", color:"#065F46", margin:"0 0 12px", display:"flex", alignItems:"center", gap:8 }}>
+            🟢 Active Shows <span style={{ fontSize:13, fontWeight:700, background:"#ECFDF5", color:"#065F46", borderRadius:10, padding:"2px 9px" }}>{activeShows.length}</span>
+          </h2>
+          <div style={{ display:"grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap:12 }}>
+            {activeShows.map(show => (
+              <div key={show.id} onClick={() => onViewShow(show)} style={{ background:"#fff", borderRadius:14, border:"2px solid #6EE7B7", borderLeft:"5px solid #059669", padding:"16px 20px", cursor:"pointer", boxShadow:"0 2px 12px rgba(5,150,105,0.1)" }}>
+                <div style={{ fontWeight:700, fontSize:16, color:"#1F2937", marginBottom:6 }}>{show.name}</div>
+                <div style={{ fontSize:13, color:"#6B7280", marginBottom:12 }}>{fmtDateRange(show.date, show.endDate)}</div>
+                <div style={{ display:"flex", gap:12 }}>
+                  <div style={{ background:"#EFF6FF", borderRadius:9, padding:"8px 14px", textAlign:"center", flex:1 }}>
+                    <div style={{ fontSize:22, fontWeight:700, color:"#1E40AF", fontFamily:"'Playfair Display',serif" }}>{show.leadCount||0}</div>
+                    <div style={{ fontSize:12, color:"#6B7280", fontWeight:600 }}>Leads</div>
+                  </div>
+                  <div style={{ background:"#ECFDF5", borderRadius:9, padding:"8px 14px", textAlign:"center", flex:1 }}>
+                    <div style={{ fontSize:22, fontWeight:700, color:"#059669", fontFamily:"'Playfair Display',serif" }}>{show.appointmentCount||0}</div>
+                    <div style={{ fontSize:12, color:"#6B7280", fontWeight:600 }}>Appts</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div style={{ display:"grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap:16, marginBottom:28 }}>
         {stats.map((s, i) => (
           <div key={i} style={{ background:"#fff", borderRadius:18, padding:"26px 22px", border:"2px solid #EDE6DC", boxShadow:"0 2px 12px rgba(0,0,0,0.07)" }}>
