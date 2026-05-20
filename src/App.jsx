@@ -2466,7 +2466,7 @@ function PostShowSurvey({ show, employee, onSubmit, onClose }) {
 // ─── Serviceminder API ─────────────────────────────────────────────────────
 const SM_API_KEY = "d23d99de62b94383b87f8ccef20543cb"; // sandbox test key
 
-async function smAddLead({ firstName, lastName, phone, email, address, zip, note }) {
+async function smAddLead({ firstName, lastName, phone, email, address, city, state, zip, note, staffNotes }) {
   const fullName = `${firstName} ${lastName}`.trim();
 
   // Step 1 — create/update the contact
@@ -2477,11 +2477,12 @@ async function smAddLead({ firstName, lastName, phone, email, address, zip, note
     AddressSearch:           address || "",
     DigitalTrackingIdSearch: "",
     Matches: [{
-      Id:          0,
       Name:        fullName,
       Phone:       phone || "",
       Email:       email || "",
       Address1:    address || "",
+      City:        city || "",
+      State:       state || "",
       Zip:         zip || "",
       LeadSource:  "Show-Event",
     }],
@@ -2497,13 +2498,14 @@ async function smAddLead({ firstName, lastName, phone, email, address, zip, note
   const data = await res.json();
   if (data.ResultCode !== 0) throw new Error(data.Message || "Failed to create contact");
 
-  // Step 2 — add note with show info + employee name
+  // Step 2 — add note with show info + employee name + staff notes
   const contactId = data.Matches?.[0]?.Id;
-  if (contactId && note) {
+  if (contactId) {
+    const fullNote = [note, staffNotes ? `Staff notes: ${staffNotes}` : ""].filter(Boolean).join("\n");
     await fetch("https://serviceminder.com/api/contacts/addnote", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ ContactId: contactId, Note: note, ApiKey: SM_API_KEY }),
+      body:    JSON.stringify({ ContactId: contactId, Note: { Text: fullNote }, ApiKey: SM_API_KEY }),
     });
   }
   return data;
@@ -2511,7 +2513,7 @@ async function smAddLead({ firstName, lastName, phone, email, address, zip, note
 
 // ─── Lead Form Modal ───────────────────────────────────────────────────────
 function LeadFormModal({ show, emp, onClose }) {
-  const blank = { firstName:"", lastName:"", phone:"", email:"", address:"", zip:"" };
+  const blank = { firstName:"", lastName:"", phone:"", email:"", address:"", city:"", state:"", zip:"", staffNotes:"" };
   const [form, setForm] = useState({ ...blank });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -2531,7 +2533,7 @@ function LeadFormModal({ show, emp, onClose }) {
     setError("");
     setSaving(true);
     try {
-      const result = await smAddLead({ ...form, note });
+      const result = await smAddLead({ ...form, note, staffNotes: form.staffNotes });
       if (result.ResultCode === 0) {
         setSuccess(true);
         setForm({ ...blank });
@@ -2598,13 +2600,35 @@ function LeadFormModal({ show, emp, onClose }) {
                 <input value={form.email} onChange={e => set("email", e.target.value)} style={inputStyle} placeholder="jane@email.com" type="email" />
               </div>
               <div style={{ marginBottom:12 }}>
-                <label style={labelStyle}>Address</label>
-                <input value={form.address} onChange={e => set("address", e.target.value)} style={inputStyle} placeholder="123 Main St" />
+                <AddressAutocomplete
+                  value={form.address}
+                  onChange={v => set("address", v)}
+                  onPlaceSelected={({ street, city, state, zip }) => {
+                    setForm(p => ({ ...p, address: street, city, state, zip }));
+                  }}
+                />
               </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 100px", gap:10, marginBottom:16 }}>
+                <div>
+                  <label style={labelStyle}>City</label>
+                  <input value={form.city} onChange={e => set("city", e.target.value)} style={inputStyle} placeholder="Detroit" />
+                </div>
+                <div>
+                  <label style={labelStyle}>State</label>
+                  <input value={form.state} onChange={e => set("state", e.target.value)} style={inputStyle} placeholder="MI" maxLength={2} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Zip *</label>
+                  <input value={form.zip} onChange={e => set("zip", e.target.value)} style={inputStyle} placeholder="48001" maxLength={5} />
+                </div>
+              </div>
+              <div style={{ fontSize:12, color:"#9CA3AF", marginBottom:16, marginTop:-10 }}>📍 Zip code routes this lead to the correct Five Star location</div>
               <div style={{ marginBottom:16 }}>
-                <label style={labelStyle}>Zip Code *</label>
-                <input value={form.zip} onChange={e => set("zip", e.target.value)} style={inputStyle} placeholder="48001" maxLength={5} />
-                <div style={{ fontSize:12, color:"#9CA3AF", marginTop:4 }}>Used to route lead to the correct Five Star location</div>
+                <label style={labelStyle}>Notes for Inside Sales</label>
+                <textarea value={form.staffNotes} onChange={e => set("staffNotes", e.target.value)}
+                  placeholder="Any details the sales team should know… interest level, best time to call, specific product interest, etc."
+                  rows={3}
+                  style={{ ...inputStyle, resize:"vertical", lineHeight:1.5 }} />
               </div>
               {/* Auto note preview */}
               <div style={{ background:"#F7F2EB", borderRadius:9, padding:"10px 13px", marginBottom:16, fontSize:13, color:"#6B7280" }}>
