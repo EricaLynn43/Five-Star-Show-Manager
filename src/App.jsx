@@ -2468,20 +2468,22 @@ const SM_API_KEY = "d23d99de62b94383b87f8ccef20543cb"; // sandbox test key
 
 async function smAddLead({ firstName, lastName, phone, email, address, zip, note }) {
   const fullName = `${firstName} ${lastName}`.trim();
+
+  // Step 1 — create/update the contact
   const body = {
-    NameSearch:               fullName,
-    PhoneSearch:              phone || "",
-    EmailSearch:              email || "",
-    AddressSearch:            address || "",
-    DigitalTrackingIdSearch:  "",
+    NameSearch:              fullName,
+    PhoneSearch:             phone || "",
+    EmailSearch:             email || "",
+    AddressSearch:           address || "",
+    DigitalTrackingIdSearch: "",
     Matches: [{
-      FirstName: firstName,
-      LastName:  lastName,
-      Phone:     phone || "",
-      Email:     email || "",
-      Address:   address || "",
-      Zip:       zip || "",
-      Notes:     note || "",
+      Id:          0,
+      Name:        fullName,
+      Phone:       phone || "",
+      Email:       email || "",
+      Address1:    address || "",
+      Zip:         zip || "",
+      LeadSource:  "Show-Event",
     }],
     DistributeLead: true,
     ApiKey: SM_API_KEY,
@@ -2492,18 +2494,31 @@ async function smAddLead({ firstName, lastName, phone, email, address, zip, note
     body:    JSON.stringify(body),
   });
   if (!res.ok) throw new Error("Network error: " + res.status);
-  return await res.json();
+  const data = await res.json();
+  if (data.ResultCode !== 0) throw new Error(data.Message || "Failed to create contact");
+
+  // Step 2 — add note with show info + employee name
+  const contactId = data.Matches?.[0]?.Id;
+  if (contactId && note) {
+    await fetch("https://serviceminder.com/api/contacts/addnote", {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify({ ContactId: contactId, Note: note, ApiKey: SM_API_KEY }),
+    });
+  }
+  return data;
 }
 
 // ─── Lead Form Modal ───────────────────────────────────────────────────────
-function LeadFormModal({ show, onClose }) {
+function LeadFormModal({ show, emp, onClose }) {
   const blank = { firstName:"", lastName:"", phone:"", email:"", address:"", zip:"" };
   const [form, setForm] = useState({ ...blank });
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
-  const note = `Lead captured at ${show.name}${show.date ? " — " + fmtDate(show.date) : ""}`;
+  const empName = emp ? `${emp.firstName} ${emp.lastName}` : "Unknown";
+  const note = `Lead captured at ${show.name}${show.date ? " — " + fmtDate(show.date) : ""} by ${empName}`;
 
   function set(k, v) { setForm(p => ({ ...p, [k]: v })); }
 
@@ -2794,7 +2809,7 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
           })
       }
       {surveyShow && <PostShowSurvey show={surveyShow} employee={emp} onSubmit={s=>{onUpdateShow(s);setSurveyShow(null);}} onClose={()=>setSurveyShow(null)} />}
-      {leadShow   && <LeadFormModal show={leadShow} onClose={() => setLeadShow(null)} />}
+      {leadShow   && <LeadFormModal show={leadShow} emp={emp} onClose={() => setLeadShow(null)} />}
     </div>
   );
 }
