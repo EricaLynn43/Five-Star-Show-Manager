@@ -751,26 +751,37 @@ function CalendarPicker({ value, onChange, label, required }) {
 function AddressAutocomplete({ value, onChange, onPlaceSelected }) {
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
+
   useEffect(() => {
-    if (!window.google || !inputRef.current) return;
-    autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
-      types: ["address"],
-      componentRestrictions: { country: "us" },
-    });
-    autocompleteRef.current.addListener("place_changed", () => {
-      const place = autocompleteRef.current.getPlace();
-      if (!place.address_components) return;
-      let street = "", city = "", state = "", zip = "";
-      const get = type => (place.address_components.find(c => c.types.includes(type)) || {}).long_name || "";
-      const getShort = type => (place.address_components.find(c => c.types.includes(type)) || {}).short_name || "";
-      const num   = get("street_number");
-      const road  = get("route");
-      street = num && road ? `${num} ${road}` : road || num;
-      city   = get("locality") || get("sublocality") || get("neighborhood");
-      state  = getShort("administrative_area_level_1");
-      zip    = get("postal_code");
-      onPlaceSelected({ street, city, state, zip });
-    });
+    function initAutocomplete() {
+      if (!window.google || !window.google.maps || !inputRef.current) return false;
+      if (autocompleteRef.current) return true; // already initialized
+      autocompleteRef.current = new window.google.maps.places.Autocomplete(inputRef.current, {
+        types: ["address"],
+        componentRestrictions: { country: "us" },
+      });
+      autocompleteRef.current.addListener("place_changed", () => {
+        const place = autocompleteRef.current.getPlace();
+        if (!place.address_components) return;
+        const get = type => (place.address_components.find(c => c.types.includes(type)) || {}).long_name || "";
+        const getShort = type => (place.address_components.find(c => c.types.includes(type)) || {}).short_name || "";
+        const num  = get("street_number");
+        const road = get("route");
+        onPlaceSelected({
+          street: num && road ? `${num} ${road}` : road || num,
+          city:   get("locality") || get("sublocality") || get("neighborhood"),
+          state:  getShort("administrative_area_level_1"),
+          zip:    get("postal_code"),
+        });
+      });
+      return true;
+    }
+
+    if (!initAutocomplete()) {
+      // Google not ready yet — retry every 100ms until it is
+      const interval = setInterval(() => { if (initAutocomplete()) clearInterval(interval); }, 100);
+      return () => clearInterval(interval);
+    }
     return () => { if (autocompleteRef.current) window.google.maps.event.clearInstanceListeners(autocompleteRef.current); };
   }, []);
   return (
@@ -2505,7 +2516,7 @@ async function smAddLead({ firstName, lastName, phone, email, address, city, sta
     await fetch("https://serviceminder.com/api/contacts/addnote", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ ContactId: contactId, Note: { Text: fullNote }, ApiKey: SM_API_KEY }),
+      body:    JSON.stringify({ ContactId: contactId, Note: fullNote, ApiKey: SM_API_KEY }),
     });
   }
   return data;
