@@ -1857,21 +1857,33 @@ function ImportModal({ onImport, onClose }) {
 
 // ─── Shows List (isMobile is now properly included in props) ───────────────
 function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportShows, isMobile }) {
-  const [filterStatus, setFilterStatus] = useState("all");
-  const [filterMonth, setFilterMonth]   = useState("all");
+  const [filterStatus,   setFilterStatus]   = useState("all");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo,   setFilterDateTo]   = useState("");
+  const [showDateFilter, setShowDateFilter] = useState(false);
   const [search, setSearch] = useState("");
   const [showImport, setShowImport] = useState(false);
+  const dateFilterRef = useRef(null);
   const { confirm, ConfirmDialog } = useConfirm();
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (dateFilterRef.current && !dateFilterRef.current.contains(e.target)) setShowDateFilter(false);
+    }
+    if (showDateFilter) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showDateFilter]);
+
   const filtered = shows.filter(s => {
     const ms = filterStatus === "all" || s.status === filterStatus;
-    const mm = filterMonth === "all" || (s.date && s.date.slice(5,7) === filterMonth);
+    const mf = !filterDateFrom || (s.date && s.date >= filterDateFrom);
+    const mt2 = !filterDateTo   || (s.date && s.date <= filterDateTo);
     const mt = s.name.toLowerCase().includes(search.toLowerCase()) ||
                (s.contactName || "").toLowerCase().includes(search.toLowerCase());
-    return ms && mm && mt;
+    return ms && mf && mt2 && mt;
   });
   const totalShowCost = filtered.reduce((a, s) => a + (+s.totalDue || 0), 0);
-  // Only show months that have shows
-  const activeMonths = [...new Set(shows.filter(s => s.date).map(s => s.date.slice(5,7)))].sort();
+  const dateFilterActive = filterDateFrom || filterDateTo;
   return (
     <div style={{ padding: isMobile ? "20px 16px" : "36px 44px" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:28, flexWrap:"wrap", gap:12 }}>
@@ -1910,24 +1922,6 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
           })}
         </div>
       </div>
-      {activeMonths.length > 0 && (
-        <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:22, alignItems:"center" }}>
-          <span style={{ fontSize:13, fontWeight:700, color:"#9CA3AF" }}>Month:</span>
-          {["all", ...activeMonths].map(m => {
-            const active = filterMonth === m;
-            return (
-              <button key={m} onClick={() => setFilterMonth(m)} style={{
-                padding:"7px 14px", borderRadius:20, border:"2px solid",
-                borderColor: active ? "#C4944A" : "#EDE6DC",
-                background: active ? "#FFF7ED" : "#fff",
-                color: active ? "#B45309" : "#6B7280",
-                fontWeight:700, fontSize:13, cursor:"pointer" }}>
-                {m === "all" ? "All Months" : MONTHS[+m - 1]}
-              </button>
-            );
-          })}
-        </div>
-      )}
       {isMobile ? (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {filtered.length === 0
@@ -1958,9 +1952,54 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
             <table style={{ width:"100%", borderCollapse:"collapse" }}>
               <thead>
                 <tr style={{ background:"#F7F2EB", borderBottom:"2px solid #EDE6DC" }}>
-                  {["Show Name","Date","Category","Status","Booth","Staff","Show Total","Deposit Paid","Balance",""].map((h, i) => (
+                  {["Show Name","Category","Status","Booth","Staff","Show Total","Deposit Paid","Balance",""].map((h, i) => (
                     <th key={i} style={{ padding:"14px 18px", textAlign:"left", fontSize:14, fontWeight:700, color:"#4B5563", textTransform:"uppercase", letterSpacing:"0.05em", whiteSpace:"nowrap" }}>{h}</th>
                   ))}
+                  <th style={{ padding:"14px 18px", textAlign:"left", fontSize:14, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em", whiteSpace:"nowrap" }}>
+                    <div ref={dateFilterRef} style={{ position:"relative", display:"inline-block" }}>
+                      <button onClick={() => setShowDateFilter(o => !o)} style={{
+                        background:"none", border:"none", cursor:"pointer", padding:0,
+                        display:"flex", alignItems:"center", gap:5,
+                        color: dateFilterActive ? "#C4944A" : "#4B5563", fontWeight:700, fontSize:14,
+                        textTransform:"uppercase", letterSpacing:"0.05em", fontFamily:"'Nunito',sans-serif" }}>
+                        Date {dateFilterActive ? "🔽" : "▾"}
+                      </button>
+                      {showDateFilter && (
+                        <div style={{ position:"absolute", top:"calc(100% + 8px)", left:0, zIndex:3000,
+                          background:"#fff", borderRadius:14, boxShadow:"0 8px 32px rgba(0,0,0,0.18)",
+                          padding:"20px 22px", minWidth:300, border:"1px solid #EDE6DC" }}>
+                          <div style={{ fontWeight:700, color:"#1B3A5C", fontSize:15, marginBottom:14, fontFamily:"'Playfair Display',serif" }}>Filter by Date Range</div>
+                          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:16 }}>
+                            <div>
+                              <label style={{ display:"block", fontSize:13, fontWeight:700, color:"#374151", marginBottom:5 }}>From</label>
+                              <input type="date" value={filterDateFrom} onChange={e => setFilterDateFrom(e.target.value)}
+                                style={{ width:"100%", padding:"9px 10px", borderRadius:8, border:"2px solid #EDE6DC", fontSize:14, outline:"none", boxSizing:"border-box", color:"#1F2937" }} />
+                            </div>
+                            <div>
+                              <label style={{ display:"block", fontSize:13, fontWeight:700, color:"#374151", marginBottom:5 }}>To</label>
+                              <input type="date" value={filterDateTo} onChange={e => setFilterDateTo(e.target.value)}
+                                style={{ width:"100%", padding:"9px 10px", borderRadius:8, border:"2px solid #EDE6DC", fontSize:14, outline:"none", boxSizing:"border-box", color:"#1F2937" }} />
+                            </div>
+                          </div>
+                          <div style={{ display:"flex", gap:8 }}>
+                            <button onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); setShowDateFilter(false); }}
+                              style={{ flex:1, padding:"10px", borderRadius:9, border:"2px solid #EDE6DC", background:"#fff", color:"#6B7280", fontSize:14, fontWeight:700, cursor:"pointer" }}>
+                              Clear
+                            </button>
+                            <button onClick={() => setShowDateFilter(false)}
+                              style={{ flex:1, padding:"10px", borderRadius:9, border:"none", background:"#1B3A5C", color:"#fff", fontSize:14, fontWeight:700, cursor:"pointer" }}>
+                              Apply
+                            </button>
+                          </div>
+                          {dateFilterActive && (
+                            <div style={{ marginTop:10, fontSize:12, color:"#C4944A", fontWeight:700, textAlign:"center" }}>
+                              {filterDateFrom ? fmtDate(filterDateFrom) : "Any"} → {filterDateTo ? fmtDate(filterDateTo) : "Any"}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -1974,7 +2013,6 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
                           onMouseEnter={e => e.currentTarget.style.background="#FAF6F0"}
                           onMouseLeave={e => e.currentTarget.style.background="transparent"}>
                           <td style={{ padding:"15px 18px", fontWeight:700, color:"#1F2937", fontSize:15 }}>{show.name}</td>
-                          <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14, whiteSpace:"nowrap" }}>{fmtDateRange(show.date, show.endDate)}</td>
                           <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14 }}>{show.category}</td>
                           <td style={{ padding:"15px 18px" }}><StatusBadge status={show.status} /></td>
                           <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14 }}>{show.boothSize || "—"}</td>
@@ -1982,6 +2020,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
                           <td style={{ padding:"15px 18px", color:"#1B3A5C", fontWeight:700, fontSize:14 }}>{fmtMoney(show.totalDue)}</td>
                           <td style={{ padding:"15px 18px", color:"#059669", fontWeight:700, fontSize:14 }}>{fmtMoney(show.depositPaid)}</td>
                           <td style={{ padding:"15px 18px", fontWeight:700, fontSize:14, color: balance > 0 ? "#DC2626" : "#059669" }}>{fmtMoney(balance)}</td>
+                          <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14, whiteSpace:"nowrap" }}>{fmtDateRange(show.date, show.endDate)}</td>
                           <td style={{ padding:"15px 12px" }}>
                             <button onClick={async e => { e.stopPropagation(); if (await confirm(`Delete "${show.name}"?`, { danger:true, confirmLabel:"Delete", subtext:"This cannot be undone." })) onDeleteShow(show.id); }}
                               style={{ background:"#FEF2F2", color:"#DC2626", border:"1px solid #FECACA", borderRadius:8, padding:"6px 12px", fontSize:13, cursor:"pointer", fontWeight:600 }}>Delete</button>
@@ -1994,11 +2033,11 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
               {filtered.length > 0 && (
                 <tfoot>
                   <tr style={{ background:"#F7F2EB", borderTop:"2px solid #EDE6DC" }}>
-                    <td colSpan={6} style={{ padding:"13px 18px", fontWeight:700, fontSize:14, color:"#4B5563" }}>
+                    <td colSpan={5} style={{ padding:"13px 18px", fontWeight:700, fontSize:14, color:"#4B5563" }}>
                       {filtered.length} show{filtered.length !== 1 ? "s" : ""}
                     </td>
                     <td style={{ padding:"13px 18px", fontWeight:700, fontSize:15, color:"#1B3A5C" }}>{fmtMoney(totalShowCost)}</td>
-                    <td colSpan={3} />
+                    <td colSpan={4} />
                   </tr>
                 </tfoot>
               )}
