@@ -2516,7 +2516,7 @@ async function smAddLead({ firstName, lastName, phone, email, address, city, sta
     await fetch("https://serviceminder.com/api/contacts/addnote", {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ ContactId: contactId, Note: fullNote, ApiKey: SM_API_KEY }),
+      body:    JSON.stringify({ ContactId: contactId, Note: { Id: 0, Title: "Show Lead", Body: fullNote }, ApiKey: SM_API_KEY }),
     });
   }
   return data;
