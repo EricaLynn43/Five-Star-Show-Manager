@@ -456,7 +456,7 @@ function SetPasswordScreen() {
 }
 
 // ─── Employees View ────────────────────────────────────────────────────────
-function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDeleteEmployee, notifTiming, onChangeNotifTiming, user, onImmediateSave }) {
+function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDeleteEmployee, notifTiming, onChangeNotifTiming, user, onImmediateSave, onPreviewPortal }) {
   const [showForm, setShowForm] = useState(false);
   const blank = { firstName:"", lastName:"", email:"", phone:"", canViewSchedule:true, canEditShows:false, isAdmin:false };
   const [newEmp,   setNewEmp]   = useState({ ...blank });
@@ -640,6 +640,10 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
                     {inviting[emp.id] ? "Sending…" : emp.inviteStatus === "invited" ? "📧 Re-send" : "📧 Send Invite"}
                   </button>
                 </div>
+                <button onClick={() => onPreviewPortal && onPreviewPortal(emp.id)}
+                  style={{ width:"100%", marginBottom:16, padding:"10px", borderRadius:9, border:"2px dashed #C4944A", background:"#FFFBF5", color:"#C4944A", fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+                  👁 Preview Portal as {emp.firstName}
+                </button>
                 <div style={{ fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10 }}>Assigned Shows ({assigned.length})</div>
                 {assigned.length === 0
                   ? <span style={{ fontSize:14, color:"#9CA3AF" }}>No shows assigned yet</span>
@@ -2674,6 +2678,8 @@ export default function App() {
   const [isEmployee,           setIsEmployee]           = useState(false);
   const [employeeRecordId,     setEmployeeRecordId]     = useState(null);
   const [showPasswordRecovery, setShowPasswordRecovery] = useState(false);
+  // Owner preview mode
+  const [previewEmployeeId,    setPreviewEmployeeId]    = useState(null);
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -2852,6 +2858,45 @@ export default function App() {
   // ── Employee password-setup screen (after clicking invite link) ───────────
   if (showPasswordRecovery) return <SetPasswordScreen />;
 
+  // ── Owner preview mode — see the portal as a specific employee ────────────
+  if (previewEmployeeId) {
+    const empRecord = employees.find(e => e.id === previewEmployeeId);
+    return (
+      <>
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Nunito:wght@400;500;600;700&display=swap');
+          * { box-sizing:border-box; margin:0; padding:0; font-family:'Nunito',sans-serif; }
+          input:focus, select:focus { border-color:#1B3A5C !important; }
+        `}</style>
+        <div style={{ minHeight:"100vh", background:"#F7F2EB" }}>
+          <div style={{ background:"#C4944A", color:"#fff", padding:"10px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+            <div style={{ fontSize:13, fontWeight:700 }}>👁 Preview Mode — viewing as {empRecord?.firstName} {empRecord?.lastName}</div>
+            <button onClick={() => setPreviewEmployeeId(null)}
+              style={{ background:"#fff", color:"#C4944A", border:"none", borderRadius:8, padding:"7px 16px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+              ✕ Exit Preview
+            </button>
+          </div>
+          <div style={{ background:"#1B3A5C", color:"#fff", padding:"14px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:"0 2px 12px rgba(0,0,0,0.15)" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+              <span style={{ fontSize:24 }}>⭐</span>
+              <div>
+                <div style={{ fontSize:12, fontWeight:700, color:"#C4944A", textTransform:"uppercase", letterSpacing:"0.1em" }}>Five Star Show Manager</div>
+                {empRecord && <div style={{ fontSize:17, fontWeight:700 }}>{empRecord.firstName} {empRecord.lastName}</div>}
+              </div>
+            </div>
+          </div>
+          <EmployeePortalView
+            employees={employees}
+            shows={shows}
+            onUpdateShow={show => setShows(prev => prev.map(s => s.id===show.id ? show : s))}
+            notifTiming={notifTiming}
+            lockedEmployeeId={previewEmployeeId}
+          />
+        </div>
+      </>
+    );
+  }
+
   // ── Employee portal (restricted — no management UI) ───────────────────────
   if (isEmployee) {
     const empRecord = employees.find(e => e.id === employeeRecordId);
@@ -2983,7 +3028,8 @@ export default function App() {
                 { owner_id:user.id, shows, employees:updated, location_name:locationName, notif_timing:notifTiming },
                 { onConflict:"owner_id" }
               );
-            }} />}
+            }}
+            onPreviewPortal={id => setPreviewEmployeeId(id)} />}
           {view==="portal"    && <EmployeePortalView employees={employees} shows={shows} onUpdateShow={updateShow} notifTiming={notifTiming} />}
         </div>
       </div>
