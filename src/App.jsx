@@ -661,7 +661,7 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
 }
 
 // ─── Show Form Modal ────────────────────────────────────────────────────────
-const EMPTY_SHOW = { name:"", date:"", endDate:"", startTime:"", endTime:"", category:"", status:"lead",
+const EMPTY_SHOW = { name:"", date:"", endDate:"", startTime:"", endTime:"", loadInDate:"", loadInTime:"", tearDownDate:"", tearDownTime:"", category:"", status:"lead",
   street:"", city:"", state:"", zip:"", contactName:"", contactEmail:"", contactPhone:"",
   boothSize:"", expectedParticipation:"", isIndoor:true, hasElectrical:false, needsTrailer:false,
   employeesNeeded:"", contactsCollected:"", depositDue:"", depositDueDate:"",
@@ -845,6 +845,10 @@ function ShowFormModal({ show, employees, onSave, onClose }) {
           </div>
           {inp("Start Time","startTime","time")}
           {inp("End Time","endTime","time")}
+          <CalendarPicker value={form.loadInDate} onChange={v => set("loadInDate",v)} label="Load In Date" />
+          {inp("Load In Time","loadInTime","time")}
+          <CalendarPicker value={form.tearDownDate} onChange={v => set("tearDownDate",v)} label="Tear Down Date" />
+          {inp("Tear Down Time","tearDownTime","time")}
           <div style={{ gridColumn:"1/-1" }}>
             <AddressAutocomplete
               value={form.street || ""}
@@ -919,7 +923,7 @@ function ShowFormModal({ show, employees, onSave, onClose }) {
             }
           </div>
           <SectionHead title="Financials" />
-          {money("Total Show Cost","totalDue")}
+          {money("Total Show Cost (including add ons)","totalDue")}
           <CalendarPicker value={form.finalPaymentDueDate} onChange={v => set("finalPaymentDueDate",v)} label="Final Payment Due Date" />
           {money("Deposit Due","depositDue")}
           <CalendarPicker value={form.depositDueDate} onChange={v => set("depositDueDate",v)} label="Deposit Due Date" />
@@ -1072,6 +1076,8 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
           <p style={{ margin:"0 0 4px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Show Details</p>
           <Row label="Date" value={fmtDateRange(show.date, show.endDate)} />
           <Row label="Time" value={show.startTime && show.endTime ? show.startTime + " – " + show.endTime : null} />
+          {(show.loadInDate || show.loadInTime) && <Row label="Load In" value={[show.loadInDate ? fmtDate(show.loadInDate) : null, show.loadInTime || null].filter(Boolean).join(" at ")} />}
+          {(show.tearDownDate || show.tearDownTime) && <Row label="Tear Down" value={[show.tearDownDate ? fmtDate(show.tearDownDate) : null, show.tearDownTime || null].filter(Boolean).join(" at ")} />}
           <Row label="Category" value={show.category} />
           {(show.street || show.city) && (() => {
             const full = [show.street, show.city, show.state, show.zip].filter(Boolean).join(", ");
@@ -1104,7 +1110,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
           <Row label="Phone" value={show.contactPhone} />
 
           <p style={{ margin:"20px 0 4px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Financials</p>
-          <FinRow label="Total Show Cost"       amount={fmtMoney(show.totalDue)}   date={show.finalPaymentDueDate} />
+          <FinRow label="Total Show Cost (including add ons)" amount={fmtMoney(show.totalDue)} date={show.finalPaymentDueDate} />
           <FinRow label="Deposit Due"           amount={fmtMoney(show.depositDue)} date={show.depositDueDate} />
           <FinRow label="Deposit Paid"          amount={fmtMoney(show.depositPaid)} date={show.depositPaidDate} accent="#059669" />
           <FinRow label="Balance / Final"       amount={fmtMoney(show.totalPaid)}  date={show.totalPaidDate} accent={(+show.totalPaid||0)>0?"#059669":undefined} />
@@ -1852,15 +1858,20 @@ function ImportModal({ onImport, onClose }) {
 // ─── Shows List (isMobile is now properly included in props) ───────────────
 function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportShows, isMobile }) {
   const [filterStatus, setFilterStatus] = useState("all");
+  const [filterMonth, setFilterMonth]   = useState("all");
   const [search, setSearch] = useState("");
   const [showImport, setShowImport] = useState(false);
   const { confirm, ConfirmDialog } = useConfirm();
   const filtered = shows.filter(s => {
     const ms = filterStatus === "all" || s.status === filterStatus;
+    const mm = filterMonth === "all" || (s.date && s.date.slice(5,7) === filterMonth);
     const mt = s.name.toLowerCase().includes(search.toLowerCase()) ||
                (s.contactName || "").toLowerCase().includes(search.toLowerCase());
-    return ms && mt;
+    return ms && mm && mt;
   });
+  const totalShowCost = filtered.reduce((a, s) => a + (+s.totalDue || 0), 0);
+  // Only show months that have shows
+  const activeMonths = [...new Set(shows.filter(s => s.date).map(s => s.date.slice(5,7)))].sort();
   return (
     <div style={{ padding: isMobile ? "20px 16px" : "36px 44px" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:28, flexWrap:"wrap", gap:12 }}>
@@ -1879,7 +1890,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
           </div>
         )}
       </div>
-      <div style={{ display:"flex", gap:12, marginBottom:22, flexWrap:"wrap", alignItems:"center" }}>
+      <div style={{ display:"flex", gap:12, marginBottom:16, flexWrap:"wrap", alignItems:"center" }}>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍  Search shows or contacts…"
           style={{ flex:"1 1 240px", padding:"12px 16px", borderRadius:10, border:"2px solid #EDE6DC", fontSize:15, outline:"none", background:"#fff", color:"#1F2937" }} />
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
@@ -1899,6 +1910,24 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
           })}
         </div>
       </div>
+      {activeMonths.length > 0 && (
+        <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:22, alignItems:"center" }}>
+          <span style={{ fontSize:13, fontWeight:700, color:"#9CA3AF" }}>Month:</span>
+          {["all", ...activeMonths].map(m => {
+            const active = filterMonth === m;
+            return (
+              <button key={m} onClick={() => setFilterMonth(m)} style={{
+                padding:"7px 14px", borderRadius:20, border:"2px solid",
+                borderColor: active ? "#C4944A" : "#EDE6DC",
+                background: active ? "#FFF7ED" : "#fff",
+                color: active ? "#B45309" : "#6B7280",
+                fontWeight:700, fontSize:13, cursor:"pointer" }}>
+                {m === "all" ? "All Months" : MONTHS[+m - 1]}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {isMobile ? (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
           {filtered.length === 0
@@ -1929,7 +1958,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
             <table style={{ width:"100%", borderCollapse:"collapse" }}>
               <thead>
                 <tr style={{ background:"#F7F2EB", borderBottom:"2px solid #EDE6DC" }}>
-                  {["Show Name","Date","Category","Status","Booth","Staff","Deposit Paid","Balance",""].map((h, i) => (
+                  {["Show Name","Date","Category","Status","Booth","Staff","Show Total","Deposit Paid","Balance",""].map((h, i) => (
                     <th key={i} style={{ padding:"14px 18px", textAlign:"left", fontSize:14, fontWeight:700, color:"#4B5563", textTransform:"uppercase", letterSpacing:"0.05em", whiteSpace:"nowrap" }}>{h}</th>
                   ))}
                 </tr>
@@ -1950,6 +1979,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
                           <td style={{ padding:"15px 18px" }}><StatusBadge status={show.status} /></td>
                           <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14 }}>{show.boothSize || "—"}</td>
                           <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14 }}>{getAssignedEmpIds(show).size}/{show.employeesNeeded||0}</td>
+                          <td style={{ padding:"15px 18px", color:"#1B3A5C", fontWeight:700, fontSize:14 }}>{fmtMoney(show.totalDue)}</td>
                           <td style={{ padding:"15px 18px", color:"#059669", fontWeight:700, fontSize:14 }}>{fmtMoney(show.depositPaid)}</td>
                           <td style={{ padding:"15px 18px", fontWeight:700, fontSize:14, color: balance > 0 ? "#DC2626" : "#059669" }}>{fmtMoney(balance)}</td>
                           <td style={{ padding:"15px 12px" }}>
@@ -1961,6 +1991,17 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
                     })
                 }
               </tbody>
+              {filtered.length > 0 && (
+                <tfoot>
+                  <tr style={{ background:"#F7F2EB", borderTop:"2px solid #EDE6DC" }}>
+                    <td colSpan={6} style={{ padding:"13px 18px", fontWeight:700, fontSize:14, color:"#4B5563" }}>
+                      {filtered.length} show{filtered.length !== 1 ? "s" : ""}
+                    </td>
+                    <td style={{ padding:"13px 18px", fontWeight:700, fontSize:15, color:"#1B3A5C" }}>{fmtMoney(totalShowCost)}</td>
+                    <td colSpan={3} />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         </div>
