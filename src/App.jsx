@@ -1952,9 +1952,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
             <table style={{ width:"100%", borderCollapse:"collapse" }}>
               <thead>
                 <tr style={{ background:"#F7F2EB", borderBottom:"2px solid #EDE6DC" }}>
-                  {["Show Name","Category","Status","Booth","Staff","Show Total","Deposit Paid","Balance",""].map((h, i) => (
-                    <th key={i} style={{ padding:"14px 18px", textAlign:"left", fontSize:14, fontWeight:700, color:"#4B5563", textTransform:"uppercase", letterSpacing:"0.05em", whiteSpace:"nowrap" }}>{h}</th>
-                  ))}
+                  <th style={{ padding:"14px 18px", textAlign:"left", fontSize:14, fontWeight:700, color:"#4B5563", textTransform:"uppercase", letterSpacing:"0.05em", whiteSpace:"nowrap" }}>Show Name</th>
                   <th style={{ padding:"14px 18px", textAlign:"left", fontSize:14, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em", whiteSpace:"nowrap" }}>
                     <div ref={dateFilterRef} style={{ position:"relative", display:"inline-block" }}>
                       <button onClick={() => setShowDateFilter(o => !o)} style={{
@@ -2000,6 +1998,9 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
                       )}
                     </div>
                   </th>
+                  {["Category","Status","Booth","Staff","Show Total","Deposit Paid","Balance",""].map((h, i) => (
+                    <th key={i} style={{ padding:"14px 18px", textAlign:"left", fontSize:14, fontWeight:700, color:"#4B5563", textTransform:"uppercase", letterSpacing:"0.05em", whiteSpace:"nowrap" }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -2013,6 +2014,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
                           onMouseEnter={e => e.currentTarget.style.background="#FAF6F0"}
                           onMouseLeave={e => e.currentTarget.style.background="transparent"}>
                           <td style={{ padding:"15px 18px", fontWeight:700, color:"#1F2937", fontSize:15 }}>{show.name}</td>
+                          <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14, whiteSpace:"nowrap" }}>{fmtDateRange(show.date, show.endDate)}</td>
                           <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14 }}>{show.category}</td>
                           <td style={{ padding:"15px 18px" }}><StatusBadge status={show.status} /></td>
                           <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14 }}>{show.boothSize || "—"}</td>
@@ -2020,7 +2022,6 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
                           <td style={{ padding:"15px 18px", color:"#1B3A5C", fontWeight:700, fontSize:14 }}>{fmtMoney(show.totalDue)}</td>
                           <td style={{ padding:"15px 18px", color:"#059669", fontWeight:700, fontSize:14 }}>{fmtMoney(show.depositPaid)}</td>
                           <td style={{ padding:"15px 18px", fontWeight:700, fontSize:14, color: balance > 0 ? "#DC2626" : "#059669" }}>{fmtMoney(balance)}</td>
-                          <td style={{ padding:"15px 18px", color:"#4B5563", fontSize:14, whiteSpace:"nowrap" }}>{fmtDateRange(show.date, show.endDate)}</td>
                           <td style={{ padding:"15px 12px" }}>
                             <button onClick={async e => { e.stopPropagation(); if (await confirm(`Delete "${show.name}"?`, { danger:true, confirmLabel:"Delete", subtext:"This cannot be undone." })) onDeleteShow(show.id); }}
                               style={{ background:"#FEF2F2", color:"#DC2626", border:"1px solid #FECACA", borderRadius:8, padding:"6px 12px", fontSize:13, cursor:"pointer", fontWeight:600 }}>Delete</button>
