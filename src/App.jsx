@@ -1037,7 +1037,7 @@ const COMM_COLORS = {
   other: { bg:"#F7F2EB", border:"#D1C8BB", text:"#4B5563" },
 };
 
-function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDuplicate, userId }) {
+function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDuplicate, userId, onImmediateSave }) {
   const assigned = employees.filter(e => (show.assignedEmployees || []).includes(e.id));
   const totalPaidCalc = (+show.depositPaid||0) + (+show.totalPaid||0);
   const balance = (+show.totalDue||0) - totalPaidCalc;
@@ -1103,11 +1103,11 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
                 }
               </div>
               {canClose
-                ? <button onClick={() => onUpdateShow({ ...show, showActive:false, closedAt:new Date().toISOString() })}
+                ? <button onClick={() => { const u = { ...show, showActive:false, closedAt:new Date().toISOString() }; onUpdateShow(u); if(onImmediateSave) onImmediateSave(u); }}
                     style={{ background:"#DC2626", color:"#fff", border:"none", borderRadius:9, padding:"9px 18px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
                     🔴 Close Show
                   </button>
-                : <button onClick={() => onUpdateShow({ ...show, showActive:true, startedAt:new Date().toISOString() })}
+                : <button onClick={() => { const u = { ...show, showActive:true, startedAt:new Date().toISOString() }; onUpdateShow(u); if(onImmediateSave) onImmediateSave(u); }}
                     style={{ background:"#059669", color:"#fff", border:"none", borderRadius:9, padding:"9px 18px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
                     🟢 Start Show
                   </button>
@@ -3284,6 +3284,13 @@ export default function App() {
           onUpdateShow={updateShow}
           onDuplicate={() => duplicateShow(viewingShow)}
           userId={user?.id}
+          onImmediateSave={async (updatedShow) => {
+            const updatedShows = shows.map(s => s.id === updatedShow.id ? updatedShow : s);
+            await supabase.from("user_data").upsert(
+              { owner_id:user.id, shows:updatedShows, employees, location_name:locationName, notif_timing:notifTiming },
+              { onConflict:"owner_id" }
+            );
+          }}
         />
       )}
     </>
