@@ -2463,10 +2463,156 @@ function PostShowSurvey({ show, employee, onSubmit, onClose }) {
   );
 }
 
+// ─── Serviceminder API ─────────────────────────────────────────────────────
+const SM_API_KEY = "d23d99de62b94383b87f8ccef20543cb"; // sandbox test key
+
+async function smAddLead({ firstName, lastName, phone, email, address, zip, note }) {
+  const fullName = `${firstName} ${lastName}`.trim();
+  const body = {
+    NameSearch:               fullName,
+    PhoneSearch:              phone || "",
+    EmailSearch:              email || "",
+    AddressSearch:            address || "",
+    DigitalTrackingIdSearch:  "",
+    Matches: [{
+      FirstName: firstName,
+      LastName:  lastName,
+      Phone:     phone || "",
+      Email:     email || "",
+      Address:   address || "",
+      Zip:       zip || "",
+      Notes:     note || "",
+    }],
+    DistributeLead: true,
+    ApiKey: SM_API_KEY,
+  };
+  const res = await fetch("https://serviceminder.com/api/contacts/addupdate", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Network error: " + res.status);
+  return await res.json();
+}
+
+// ─── Lead Form Modal ───────────────────────────────────────────────────────
+function LeadFormModal({ show, onClose }) {
+  const blank = { firstName:"", lastName:"", phone:"", email:"", address:"", zip:"" };
+  const [form, setForm] = useState({ ...blank });
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
+
+  const note = `Lead captured at ${show.name}${show.date ? " — " + fmtDate(show.date) : ""}`;
+
+  function set(k, v) { setForm(p => ({ ...p, [k]: v })); }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!form.firstName || !form.lastName || !form.phone || !form.zip) {
+      setError("Please fill in First Name, Last Name, Phone, and Zip.");
+      return;
+    }
+    setError("");
+    setSaving(true);
+    try {
+      const result = await smAddLead({ ...form, note });
+      if (result.ResultCode === 0) {
+        setSuccess(true);
+        setForm({ ...blank });
+      } else {
+        setError(result.Message || "Something went wrong. Please try again.");
+      }
+    } catch (err) {
+      setError("Could not reach Serviceminder. Check your connection and try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const inputStyle = { width:"100%", padding:"11px 13px", borderRadius:9, border:"2px solid #EDE6DC", fontSize:15, outline:"none", boxSizing:"border-box", color:"#1F2937", background:"#fff" };
+  const labelStyle = { display:"block", fontSize:13, fontWeight:700, color:"#374151", marginBottom:5 };
+
+  return (
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:9000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+      <div style={{ background:"#fff", borderRadius:20, width:"100%", maxWidth:460, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.25)" }}>
+        {/* Header */}
+        <div style={{ background:"#1B3A5C", borderRadius:"20px 20px 0 0", padding:"20px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <div>
+            <div style={{ fontSize:12, fontWeight:700, color:"#C4944A", textTransform:"uppercase", letterSpacing:"0.1em" }}>Add Lead</div>
+            <div style={{ fontSize:17, fontWeight:700, color:"#fff", marginTop:2 }}>{show.name}</div>
+          </div>
+          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.25)", borderRadius:8, padding:"7px 13px", color:"#fff", fontSize:18, cursor:"pointer", lineHeight:1 }}>×</button>
+        </div>
+
+        <div style={{ padding:"24px" }}>
+          {success ? (
+            <div style={{ textAlign:"center", padding:"20px 0" }}>
+              <div style={{ fontSize:52, marginBottom:12 }}>🎉</div>
+              <h3 style={{ fontFamily:"'Playfair Display',serif", color:"#1B3A5C", fontSize:22, margin:"0 0 8px" }}>Lead Added!</h3>
+              <p style={{ color:"#6B7280", fontSize:15, marginBottom:24 }}>Contact has been added to Serviceminder.</p>
+              <div style={{ display:"flex", gap:10 }}>
+                <button onClick={() => setSuccess(false)}
+                  style={{ flex:1, padding:"13px", borderRadius:10, border:"2px solid #1B3A5C", background:"#fff", color:"#1B3A5C", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+                  + Add Another
+                </button>
+                <button onClick={onClose}
+                  style={{ flex:1, padding:"13px", borderRadius:10, border:"none", background:"#1B3A5C", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+                  Done
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit}>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:12, marginBottom:12 }}>
+                <div>
+                  <label style={labelStyle}>First Name *</label>
+                  <input value={form.firstName} onChange={e => set("firstName", e.target.value)} style={inputStyle} placeholder="Jane" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Last Name *</label>
+                  <input value={form.lastName} onChange={e => set("lastName", e.target.value)} style={inputStyle} placeholder="Smith" />
+                </div>
+              </div>
+              <div style={{ marginBottom:12 }}>
+                <label style={labelStyle}>Phone *</label>
+                <input value={form.phone} onChange={e => set("phone", e.target.value)} style={inputStyle} placeholder="(555) 555-5555" type="tel" />
+              </div>
+              <div style={{ marginBottom:12 }}>
+                <label style={labelStyle}>Email</label>
+                <input value={form.email} onChange={e => set("email", e.target.value)} style={inputStyle} placeholder="jane@email.com" type="email" />
+              </div>
+              <div style={{ marginBottom:12 }}>
+                <label style={labelStyle}>Address</label>
+                <input value={form.address} onChange={e => set("address", e.target.value)} style={inputStyle} placeholder="123 Main St" />
+              </div>
+              <div style={{ marginBottom:16 }}>
+                <label style={labelStyle}>Zip Code *</label>
+                <input value={form.zip} onChange={e => set("zip", e.target.value)} style={inputStyle} placeholder="48001" maxLength={5} />
+                <div style={{ fontSize:12, color:"#9CA3AF", marginTop:4 }}>Used to route lead to the correct Five Star location</div>
+              </div>
+              {/* Auto note preview */}
+              <div style={{ background:"#F7F2EB", borderRadius:9, padding:"10px 13px", marginBottom:16, fontSize:13, color:"#6B7280" }}>
+                📌 <strong>Auto-note:</strong> {note}
+              </div>
+              {error && <div style={{ background:"#FEF2F2", color:"#DC2626", borderRadius:9, padding:"10px 13px", marginBottom:14, fontSize:13, fontWeight:600 }}>{error}</div>}
+              <button type="submit" disabled={saving}
+                style={{ width:"100%", padding:"14px", borderRadius:11, border:"none", background: saving ? "#9CA3AF" : "#1B3A5C", color:"#fff", fontSize:16, fontWeight:700, cursor: saving ? "wait" : "pointer" }}>
+                {saving ? "Submitting…" : "Submit Lead →"}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Employee Portal ───────────────────────────────────────────────────────
 function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, lockedEmployeeId, userEmail }) {
   const [selectedId, setSelectedId] = useState(lockedEmployeeId ? Number(lockedEmployeeId) : null);
   const [surveyShow, setSurveyShow] = useState(null);
+  const [leadShow,   setLeadShow]   = useState(null);
   const today = new Date(); today.setHours(0,0,0,0);
   // Match by ID first; fall back to email for locked employees (handles ID mismatch after re-invite)
   const emp = lockedEmployeeId
@@ -2605,11 +2751,15 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
                   </div>
                 )}
                 {teammates.length > 0 && (
-                  <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap" }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:12 }}>
                     <span style={{ fontSize:12, color:"#9CA3AF", fontWeight:600 }}>Team:</span>
                     {teammates.map(t => <span key={t.id} style={{ fontSize:12, background:"#F3F4F6", color:"#374151", borderRadius:10, padding:"3px 10px", fontWeight:600 }}>{t.firstName} {t.lastName}</span>)}
                   </div>
                 )}
+                <button onClick={() => setLeadShow(show)}
+                  style={{ width:"100%", padding:"11px", borderRadius:10, border:"2px solid #C4944A", background:"#FFFBF5", color:"#C4944A", fontSize:14, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:7 }}>
+                  ➕ Add Lead
+                </button>
               </div>
             );
           })
@@ -2644,6 +2794,7 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
           })
       }
       {surveyShow && <PostShowSurvey show={surveyShow} employee={emp} onSubmit={s=>{onUpdateShow(s);setSurveyShow(null);}} onClose={()=>setSurveyShow(null)} />}
+      {leadShow   && <LeadFormModal show={leadShow} onClose={() => setLeadShow(null)} />}
     </div>
   );
 }
