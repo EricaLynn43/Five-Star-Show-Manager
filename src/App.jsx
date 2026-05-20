@@ -1858,6 +1858,7 @@ function ImportModal({ onImport, onClose }) {
 // ─── Shows List (isMobile is now properly included in props) ───────────────
 function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportShows, isMobile }) {
   const [filterStatus,   setFilterStatus]   = useState("all");
+  const [filterCategory, setFilterCategory] = useState("all");
   const [filterDateFrom, setFilterDateFrom] = useState("");
   const [filterDateTo,   setFilterDateTo]   = useState("");
   const [showDateFilter, setShowDateFilter] = useState(false);
@@ -1875,12 +1876,13 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
   }, [showDateFilter]);
 
   const filtered = shows.filter(s => {
-    const ms = filterStatus === "all" || s.status === filterStatus;
+    const ms = filterStatus   === "all" || s.status   === filterStatus;
+    const mc = filterCategory === "all" || s.category === filterCategory;
     const mf = !filterDateFrom || (s.date && s.date >= filterDateFrom);
-    const mt2 = !filterDateTo   || (s.date && s.date <= filterDateTo);
+    const mt2 = !filterDateTo  || (s.date && s.date <= filterDateTo);
     const mt = s.name.toLowerCase().includes(search.toLowerCase()) ||
                (s.contactName || "").toLowerCase().includes(search.toLowerCase());
-    return ms && mf && mt2 && mt;
+    return ms && mc && mf && mt2 && mt;
   });
   const totalShowCost = filtered.reduce((a, s) => a + (+s.totalDue || 0), 0);
   const dateFilterActive = filterDateFrom || filterDateTo;
@@ -1905,22 +1907,20 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
       <div style={{ display:"flex", gap:12, marginBottom:16, flexWrap:"wrap", alignItems:"center" }}>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍  Search shows or contacts…"
           style={{ flex:"1 1 240px", padding:"12px 16px", borderRadius:10, border:"2px solid #EDE6DC", fontSize:15, outline:"none", background:"#fff", color:"#1F2937" }} />
-        <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-          {["all", ...STATUS_ORDER].map(k => {
-            const active = filterStatus === k;
-            const s = k !== "all" ? STATUSES[k] : null;
-            return (
-              <button key={k} onClick={() => setFilterStatus(k)} style={{
-                padding:"9px 15px", borderRadius:20, border:"2px solid",
-                borderColor: active ? (s ? s.dot : "#1B3A5C") : "#EDE6DC",
-                background: active ? (s ? s.bg : "#EBF1F7") : "#fff",
-                color: active ? (s ? s.text : "#1B3A5C") : "#6B7280",
-                fontWeight:700, fontSize:13, cursor:"pointer" }}>
-                {k === "all" ? "All" : STATUSES[k].label}
-              </button>
-            );
-          })}
-        </div>
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+          style={{ padding:"11px 14px", borderRadius:10, border:"2px solid " + (filterStatus !== "all" ? "#C4944A" : "#EDE6DC"),
+            fontSize:14, fontWeight:600, color: filterStatus !== "all" ? "#C4944A" : "#4B5563",
+            background:"#fff", cursor:"pointer", outline:"none", minWidth:160 }}>
+          <option value="all">All Statuses</option>
+          {STATUS_ORDER.map(k => <option key={k} value={k}>{STATUSES[k].label}</option>)}
+        </select>
+        <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
+          style={{ padding:"11px 14px", borderRadius:10, border:"2px solid " + (filterCategory !== "all" ? "#C4944A" : "#EDE6DC"),
+            fontSize:14, fontWeight:600, color: filterCategory !== "all" ? "#C4944A" : "#4B5563",
+            background:"#fff", cursor:"pointer", outline:"none", minWidth:180 }}>
+          <option value="all">All Categories</option>
+          {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
       </div>
       {isMobile ? (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
