@@ -2509,8 +2509,26 @@ async function smAddLead({ firstName, lastName, phone, email, address, city, sta
   const data = await res.json();
   if (data.ResultCode !== 0) throw new Error(data.Message || "Failed to create contact");
 
-  // Step 2 — add note with show info + employee name + staff notes
-  const contactId = data.Matches?.[0]?.Id;
+  // Step 2 — find the contact we just created to get its ID
+  const searchRes = await fetch("https://serviceminder.com/api/contacts/addupdate", {
+    method:  "POST",
+    headers: { "Content-Type": "application/json" },
+    body:    JSON.stringify({
+      NameSearch:              fullName,
+      PhoneSearch:             phone || "",
+      EmailSearch:             email || "",
+      AddressSearch:           "",
+      DigitalTrackingIdSearch: "",
+      Matches:                 [],
+      ReturnPmtOnFile:         false,
+      DistributeLead:          false,
+      ApiKey:                  SM_API_KEY,
+    }),
+  });
+  const searchData = await searchRes.json();
+  const contactId  = searchData.Matches?.[0]?.Id;
+
+  // Step 3 — add note with show info + employee name + staff notes
   if (contactId) {
     const fullNote = [note, staffNotes ? `Staff notes: ${staffNotes}` : ""].filter(Boolean).join("\n");
     await fetch("https://serviceminder.com/api/contacts/addnote", {
@@ -2563,6 +2581,7 @@ function LeadFormModal({ show, emp, onClose }) {
 
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:9000, display:"flex", alignItems:"center", justifyContent:"center", padding:16 }}>
+      <style>{`.pac-container { z-index: 99999 !important; }`}</style>
       <div style={{ background:"#fff", borderRadius:20, width:"100%", maxWidth:460, maxHeight:"90vh", overflowY:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.25)" }}>
         {/* Header */}
         <div style={{ background:"#1B3A5C", borderRadius:"20px 20px 0 0", padding:"20px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
