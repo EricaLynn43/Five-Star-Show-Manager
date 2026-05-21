@@ -391,6 +391,19 @@ function LoginScreen() {
               style={{ width:"100%", padding:"14px", borderRadius:12, border:"2px solid #1B3A5C", background:"transparent", color:"#1B3A5C", fontSize:15, fontWeight:700, cursor:loading?"wait":"pointer", opacity:loading?0.7:1, fontFamily:"'Nunito',sans-serif" }}>
               Send Magic Link Instead
             </button>
+            <button type="button" onClick={async () => {
+              if (!email) { setError("Enter your email address above first."); return; }
+              setLoading(true); setError("");
+              const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+                redirectTo: "https://five-star-show-manager.vercel.app",
+              });
+              if (err) setError(err.message);
+              else setMagicSent(true);
+              setLoading(false);
+            }} disabled={loading}
+              style={{ width:"100%", padding:"10px", borderRadius:12, border:"none", background:"transparent", color:"#9CA3AF", fontSize:13, cursor:loading?"wait":"pointer", fontFamily:"'Nunito',sans-serif", textDecoration:"underline" }}>
+              Forgot Password? Send Reset Email
+            </button>
           </form>
         )}
       </div>
@@ -2983,6 +2996,8 @@ export default function App() {
   const [notifTiming,   setNotifTiming]   = useState("countdown");
   const [editingName,   setEditingName]   = useState(false);
   const [nameInput,     setNameInput]     = useState("");
+  // Save status indicator
+  const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved" | "error"
   // Employee login
   const [isEmployee,           setIsEmployee]           = useState(false);
   const [employeeRecordId,     setEmployeeRecordId]     = useState(null);
@@ -3124,15 +3139,24 @@ export default function App() {
   // ── Save data (debounced) ─────────────────────────────────────────────────
   useEffect(() => {
     if (!loaded || !user || isEmployee) return;  // employees never write data
-    const timer = setTimeout(() => {
+    setSaveStatus("saving");
+    const timer = setTimeout(async () => {
       localStorage.setItem("shows_data",      JSON.stringify(shows));
       localStorage.setItem("employees_data",  JSON.stringify(employees));
       localStorage.setItem("location_name",   locationName);
       localStorage.setItem("notif_timing",    notifTiming);
-      supabase.from("user_data").upsert(
+      const { error } = await supabase.from("user_data").upsert(
         { owner_id:user.id, shows, employees, location_name:locationName, notif_timing:notifTiming },
         { onConflict:"owner_id" }
       );
+      if (error) {
+        console.error("Save error:", error);
+        setSaveStatus("error");
+        setTimeout(() => setSaveStatus("idle"), 4000);
+      } else {
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 2000);
+      }
     }, 800);
     return () => clearTimeout(timer);
   }, [shows, employees, locationName, notifTiming, loaded, user]);
@@ -3332,6 +3356,13 @@ export default function App() {
               })}
             </nav>
             <div style={{ padding:"16px 14px 26px", display:"flex", flexDirection:"column", gap:10 }}>
+              {saveStatus !== "idle" && (
+                <div style={{ fontSize:12, textAlign:"center", fontWeight:600, padding:"6px 10px", borderRadius:8,
+                  background: saveStatus==="error" ? "rgba(220,38,38,0.15)" : saveStatus==="saved" ? "rgba(5,150,105,0.15)" : "rgba(255,255,255,0.08)",
+                  color: saveStatus==="error" ? "#FCA5A5" : saveStatus==="saved" ? "#6EE7B7" : "rgba(255,255,255,0.5)" }}>
+                  {saveStatus==="saving" ? "💾 Saving…" : saveStatus==="saved" ? "✓ Saved" : "⚠️ Save failed — check connection"}
+                </div>
+              )}
               <button onClick={openAdd}
                 style={{ width:"100%", padding:"15px", borderRadius:12, border:"2px solid #C4944A", background:"transparent", color:"#C4944A", fontSize:15, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, transition:"all 0.15s" }}
                 onMouseEnter={e => { e.currentTarget.style.background="#C4944A"; e.currentTarget.style.color="#fff"; }}
