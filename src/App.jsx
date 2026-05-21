@@ -105,7 +105,10 @@ function getAssignedEmpIds(show) {
 }
 
 function applyAutoStatus(show) {
-  if (show.status === "complete") return show;
+  if (show.status === "complete") {
+    // Ensure complete shows are never marked active (e.g. if status changed via form)
+    return show.showActive ? { ...show, showActive:false } : show;
+  }
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const showDate = show.date ? new Date(show.date) : null;
   const daysUntil = showDate ? Math.ceil((showDate - today) / (1000 * 60 * 60 * 24)) : 999;
@@ -649,7 +652,7 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
                   ? <span style={{ fontSize:14, color:"#9CA3AF" }}>No shows assigned yet</span>
                   : assigned.map(s => (
                     <div key={s.id} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:7 }}>
-                      <div style={{ width:9, height:9, borderRadius:"50%", background:STATUSES[s.status].dot, flexShrink:0 }} />
+                      <div style={{ width:9, height:9, borderRadius:"50%", background:(STATUSES[s.status]||STATUSES.lead).dot, flexShrink:0 }} />
                       <span style={{ fontSize:14, color:"#4B5563" }}>{s.name} · {fmtDateRange(s.date, s.endDate)}</span>
                     </div>
                   ))
@@ -3010,6 +3013,11 @@ export default function App() {
   useEffect(() => {
     if (!user) return;
     async function loadData() {
+      // Reset employee state for each login (prevents stale state if different user logs in)
+      setIsEmployee(false);
+      setEmployeeRecordId(null);
+      setOwnerUserId(null);
+
       // Step 1: Check if this user is an employee (by auth UUID, then by email)
       let empOwnerId = null;
       let empRecordId = null;
@@ -3140,7 +3148,9 @@ export default function App() {
       date:"", depositPaid:0, depositPaidDate:"", depositDueDate:"",
       totalPaid:0, totalPaidDate:"", finalPaymentDueDate:"",
       assignedEmployees:[], employeeReports:[], communications:[], checklist:[], contactsCollected:"",
-      rating:null, ratingNotes:"", inventory:(show.inventory||[]).map(i=>({...i,packed:false})) };
+      rating:null, ratingNotes:"", inventory:(show.inventory||[]).map(i=>({...i,packed:false})),
+      // Reset lifecycle fields so copies never start as active or with inherited counts
+      showActive:false, startedAt:null, closedAt:null, leadCount:0, appointmentCount:0 };
     setEditing(copy); setViewing(null); setShowForm(true);
   }
   function updateShow(show) {
@@ -3340,7 +3350,7 @@ export default function App() {
 
         {/* ── Main content ── */}
         <div style={{ flex:1, overflowY:"auto", paddingBottom:isMobile?"72px":0 }}>
-          {view==="dashboard" && <DashboardView shows={shows} setView={setView} onAddShow={openAdd} onViewShow={s=>setViewing(s)} isMobile={isMobile} />}
+          {view==="dashboard" && <DashboardView shows={shows} setView={setView} onAddShow={openAdd} onViewShow={s=>setViewing(s)} isMobile={isMobile} userEmail={user?.email} />}
           {view==="shows"     && <ShowsListView shows={shows} onAddShow={openAdd} onViewShow={s=>setViewing(s)} onDeleteShow={id=>setShows(p=>p.filter(s=>s.id!==id))} onImportShows={imported=>setShows(p=>[...p,...imported])} isMobile={isMobile} />}
           {view==="pipeline"  && <PipelineView shows={shows} onUpdateShow={updateShow} onViewShow={s=>setViewing(s)} />}
           {view==="reports"   && <ReportsView shows={shows} isMobile={isMobile} />}
@@ -3395,8 +3405,9 @@ export default function App() {
 }
 
 // ─── Dashboard ─────────────────────────────────────────────────────────────
-function DashboardView({ shows, setView, onAddShow, onViewShow, isMobile }) {
+function DashboardView({ shows, setView, onAddShow, onViewShow, isMobile, userEmail }) {
   const today = new Date().toISOString().split("T")[0];
+  const firstName = userEmail ? userEmail.split("@")[0].split(".")[0].replace(/^./, c => c.toUpperCase()) : "there";
   const activeShows = shows.filter(s => s.showActive);
   const upcoming = shows.filter(s => s.date >= today && s.status !== "complete")
     .sort((a, b) => a.date.localeCompare(b.date)).slice(0, 6);
@@ -3409,7 +3420,7 @@ function DashboardView({ shows, setView, onAddShow, onViewShow, isMobile }) {
   return (
     <div style={{ padding: isMobile ? "20px 16px" : "36px 44px", maxWidth:1100 }}>
       <div style={{ marginBottom:32 }}>
-        <h1 style={{ fontSize:34, fontFamily:"'Playfair Display',serif", color:"#1B3A5C", margin:0 }}>Welcome Back, Kathy! 👋</h1>
+        <h1 style={{ fontSize:34, fontFamily:"'Playfair Display',serif", color:"#1B3A5C", margin:0 }}>Welcome Back, {firstName}! 👋</h1>
         <p style={{ color:"#6B7280", marginTop:6, fontSize:17 }}>Here's your shows & events program at a glance.</p>
       </div>
       {activeShows.length > 0 && (
