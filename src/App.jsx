@@ -2117,6 +2117,14 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
 }
 
 // ─── Calendar ──────────────────────────────────────────────────────────────
+function getISOWeek(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+
 function CalendarView({ shows, onViewShow }) {
   const today = new Date();
   const [year,  setYear]  = useState(today.getFullYear());
@@ -2132,9 +2140,17 @@ function CalendarView({ shows, onViewShow }) {
   }, [shows]);
   const pad = n => String(n).padStart(2, "0");
   const todayStr = today.getFullYear() + "-" + pad(today.getMonth() + 1) + "-" + pad(today.getDate());
+
+  // Build flat cell list then chunk into rows of 7
   const cells = [];
   for (let i = 0; i < firstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+  const rows = [];
+  for (let r = 0; r < cells.length / 7; r++) rows.push(cells.slice(r * 7, r * 7 + 7));
+
+  const COL = "44px repeat(7, 1fr)";
+
   return (
     <div style={{ padding:"36px 44px" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:24 }}>
@@ -2154,53 +2170,70 @@ function CalendarView({ shows, onViewShow }) {
         })}
       </div>
       <div style={{ background:"#fff", borderRadius:20, border:"1px solid #EDE6DC", overflow:"hidden" }}>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", borderBottom:"2px solid #EDE6DC" }}>
+        {/* Header row */}
+        <div style={{ display:"grid", gridTemplateColumns:COL, borderBottom:"2px solid #EDE6DC" }}>
+          <div style={{ padding:"14px 4px", textAlign:"center", fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.04em", background:"#F0EBE1", borderRight:"2px solid #EDE6DC" }}>WK</div>
           {DAYS.map(d => <div key={d} style={{ padding:"14px 8px", textAlign:"center", fontSize:14, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em", background:"#F7F2EB" }}>{d}</div>)}
         </div>
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)" }}>
-          {cells.map((day, idx) => {
-            const dateStr = day ? (year + "-" + pad(month + 1) + "-" + pad(day)) : null;
-            const dayShows = dateStr ? (showsByDate[dateStr] || []) : [];
-            const isToday = dateStr === todayStr;
-            return (
-              <div key={idx} style={{ minHeight:150, padding:"8px 7px",
-                borderRight:(idx+1)%7===0 ? "none" : "1px solid #F5EDE3", borderBottom:"1px solid #F5EDE3",
-                background: !day ? "#FAFAF9" : isToday ? "#FBF7F0" : "#fff" }}>
-                {day && <>
-                  <div style={{ width:34, height:34, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:5,
-                    background: isToday ? "#1B3A5C" : "transparent", color: isToday ? "#fff" : "#374151",
-                    fontWeight: isToday ? 700 : 500, fontSize:16 }}>{day}</div>
-                  {dayShows.map(s => {
-                    const st = STATUSES[s.status];
-                    const empCount = getAssignedEmpIds(s).size;
-                    const checkItems = s.checklist || [];
-                    const checkDone = checkItems.filter(c => c.checked).length;
-                    return (
-                      <div key={s.id} onClick={() => onViewShow(s)} style={{
-                        background:st.bg, border:"1px solid " + st.border, borderLeft:"3px solid " + st.dot,
-                        borderRadius:8, padding:"5px 7px", marginBottom:4, cursor:"pointer" }}>
-                        <div style={{ fontSize:13, fontWeight:700, color:st.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", marginBottom:3 }}>{s.name}</div>
-                        {(s.startTime || s.endTime) && (
-                          <div style={{ fontSize:12, color:"#6B7280", marginBottom:3 }}>
-                            {s.startTime}{s.endTime ? "–" + s.endTime : ""}
-                          </div>
-                        )}
-                        <div style={{ display:"flex", flexWrap:"wrap", gap:3 }}>
-                          {s.boothSize && <span style={{ fontSize:11, background:"rgba(0,0,0,0.06)", color:"#6B7280", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>{s.boothSize}</span>}
-                          {empCount > 0 && <span style={{ fontSize:11, background:"#EFF6FF", color:"#1E40AF", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>👥{empCount}</span>}
-                          {s.hasElectrical && <span style={{ fontSize:11, background:"#FFFBEB", color:"#B45309", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>⚡</span>}
-                          {s.needsTrailer && <span style={{ fontSize:11, background:"#F0FDF4", color:"#166534", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>🚛</span>}
-                          {checkItems.length > 0 && <span style={{ fontSize:11, background:checkDone===checkItems.length?"#ECFDF5":"#FFF1F2", color:checkDone===checkItems.length?"#065F46":"#991B1B", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>✓{checkDone}/{checkItems.length}</span>}
-                          {s.rating && <span style={{ fontSize:11, background:"#FFFBEB", color:"#B45309", borderRadius:4, padding:"1px 5px", fontWeight:700 }}>{"★".repeat(s.rating)}</span>}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </>}
+        {/* Calendar rows — one per week */}
+        {rows.map((row, r) => {
+          const firstCellDate = new Date(year, month, r * 7 - firstDay + 1);
+          const weekNum = getISOWeek(firstCellDate);
+          return (
+            <div key={r} style={{ display:"grid", gridTemplateColumns:COL }}>
+              {/* Week number */}
+              <div style={{ display:"flex", alignItems:"center", justifyContent:"center",
+                background:"#F0EBE1", borderRight:"2px solid #EDE6DC", borderBottom:"1px solid #EDE6DC",
+                fontSize:12, fontWeight:700, color:"#9CA3AF", letterSpacing:"0.02em" }}>
+                {weekNum}
               </div>
-            );
-          })}
-        </div>
+              {/* Day cells */}
+              {row.map((day, idx) => {
+                const dateStr = day ? (year + "-" + pad(month + 1) + "-" + pad(day)) : null;
+                const dayShows = dateStr ? (showsByDate[dateStr] || []) : [];
+                const isToday = dateStr === todayStr;
+                return (
+                  <div key={idx} style={{ minHeight:150, padding:"8px 7px",
+                    borderRight: idx === 6 ? "none" : "1px solid #F5EDE3",
+                    borderBottom:"1px solid #F5EDE3",
+                    background: !day ? "#FAFAF9" : isToday ? "#FBF7F0" : "#fff" }}>
+                    {day && <>
+                      <div style={{ width:34, height:34, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center", marginBottom:5,
+                        background: isToday ? "#1B3A5C" : "transparent", color: isToday ? "#fff" : "#374151",
+                        fontWeight: isToday ? 700 : 500, fontSize:16 }}>{day}</div>
+                      {dayShows.map(s => {
+                        const st = STATUSES[s.status];
+                        const empCount = getAssignedEmpIds(s).size;
+                        const checkItems = s.checklist || [];
+                        const checkDone = checkItems.filter(c => c.checked).length;
+                        return (
+                          <div key={s.id} onClick={() => onViewShow(s)} style={{
+                            background:st.bg, border:"1px solid " + st.border, borderLeft:"3px solid " + st.dot,
+                            borderRadius:8, padding:"5px 7px", marginBottom:4, cursor:"pointer" }}>
+                            <div style={{ fontSize:13, fontWeight:700, color:st.text, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap", marginBottom:3 }}>{s.name}</div>
+                            {(s.startTime || s.endTime) && (
+                              <div style={{ fontSize:12, color:"#6B7280", marginBottom:3 }}>
+                                {s.startTime}{s.endTime ? "–" + s.endTime : ""}
+                              </div>
+                            )}
+                            <div style={{ display:"flex", flexWrap:"wrap", gap:3 }}>
+                              {s.boothSize && <span style={{ fontSize:11, background:"rgba(0,0,0,0.06)", color:"#6B7280", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>{s.boothSize}</span>}
+                              {empCount > 0 && <span style={{ fontSize:11, background:"#EFF6FF", color:"#1E40AF", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>👥{empCount}</span>}
+                              {s.hasElectrical && <span style={{ fontSize:11, background:"#FFFBEB", color:"#B45309", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>⚡</span>}
+                              {s.needsTrailer && <span style={{ fontSize:11, background:"#F0FDF4", color:"#166534", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>🚛</span>}
+                              {checkItems.length > 0 && <span style={{ fontSize:11, background:checkDone===checkItems.length?"#ECFDF5":"#FFF1F2", color:checkDone===checkItems.length?"#065F46":"#991B1B", borderRadius:4, padding:"1px 5px", fontWeight:600 }}>✓{checkDone}/{checkItems.length}</span>}
+                              {s.rating && <span style={{ fontSize:11, background:"#FFFBEB", color:"#B45309", borderRadius:4, padding:"1px 5px", fontWeight:700 }}>{"★".repeat(s.rating)}</span>}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
