@@ -1053,6 +1053,27 @@ const COMM_COLORS = {
   other: { bg:"#F7F2EB", border:"#D1C8BB", text:"#4B5563" },
 };
 
+function Widget({ icon, title, summary, children, defaultOpen=false }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ border:"1px solid #EDE6DC", borderRadius:12, overflow:"hidden", marginBottom:10 }}>
+      <button onClick={() => setOpen(o => !o)} style={{
+        width:"100%", display:"flex", justifyContent:"space-between", alignItems:"center",
+        padding:"12px 16px", background: open ? "#F7F2EB" : "#fff", border:"none", cursor:"pointer",
+        borderBottom: open ? "1px solid #EDE6DC" : "none", textAlign:"left"
+      }}>
+        <div>
+          <div style={{ fontSize:14, fontWeight:700, color:"#1B3A5C" }}>{icon && <span style={{ marginRight:6 }}>{icon}</span>}{title}</div>
+          {!open && summary && <div style={{ fontSize:12, color:"#6B7280", marginTop:2 }}>{summary}</div>}
+        </div>
+        <span style={{ fontSize:13, color:"#9CA3AF", flexShrink:0, marginLeft:8, display:"inline-block",
+          transform: open ? "rotate(180deg)" : "rotate(0deg)", transition:"transform 0.2s" }}>▾</span>
+      </button>
+      {open && <div style={{ padding:"14px 16px" }}>{children}</div>}
+    </div>
+  );
+}
+
 function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDuplicate, userId, onImmediateSave }) {
   const assigned = employees.filter(e => (show.assignedEmployees || []).includes(e.id));
   const totalPaidCalc = (+show.depositPaid||0) + (+show.totalPaid||0);
@@ -1062,6 +1083,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
   const [commType,   setCommType]   = useState("call");
   const [commNote,   setCommNote]   = useState("");
   const { confirm, ConfirmDialog } = useConfirm();
+  const today = new Date(); today.setHours(0,0,0,0);
 
   function saveComm() {
     if (!commNote.trim()) { alert("Please add a note about what was covered."); return; }
@@ -1075,297 +1097,317 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
   }
 
   const Row = ({ label, value, accent }) => (
-    <div style={{ display:"flex", justifyContent:"space-between", padding:"11px 0", borderBottom:"1px solid #F5EDE3" }}>
-      <span style={{ fontSize:15, color:"#6B7280", fontWeight:500 }}>{label}</span>
-      <span style={{ fontSize:15, color:accent||"#1F2937", fontWeight:700, textAlign:"right", maxWidth:"60%" }}>{value || "—"}</span>
+    <div style={{ display:"flex", justifyContent:"space-between", padding:"9px 0", borderBottom:"1px solid #F5EDE3" }}>
+      <span style={{ fontSize:14, color:"#6B7280", fontWeight:500 }}>{label}</span>
+      <span style={{ fontSize:14, color:accent||"#1F2937", fontWeight:700, textAlign:"right", maxWidth:"60%" }}>{value || "—"}</span>
     </div>
   );
   const FinRow = ({ label, amount, date, accent }) => (
-    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"11px 0", borderBottom:"1px solid #F5EDE3" }}>
-      <span style={{ fontSize:15, color:"#6B7280", fontWeight:500 }}>{label}</span>
-      <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-        {date && <span style={{ fontSize:13, fontWeight:600, color:"#6B7280", background:"#F3F4F6", borderRadius:6, padding:"3px 8px", whiteSpace:"nowrap" }}>📅 {fmtDate(date)}</span>}
-        <span style={{ fontSize:15, color:accent||"#1F2937", fontWeight:700 }}>{amount || "—"}</span>
+    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"9px 0", borderBottom:"1px solid #F5EDE3" }}>
+      <span style={{ fontSize:14, color:"#6B7280", fontWeight:500 }}>{label}</span>
+      <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+        {date && <span style={{ fontSize:12, fontWeight:600, color:"#6B7280", background:"#F3F4F6", borderRadius:6, padding:"2px 7px", whiteSpace:"nowrap" }}>📅 {fmtDate(date)}</span>}
+        <span style={{ fontSize:14, color:accent||"#1F2937", fontWeight:700 }}>{amount || "—"}</span>
       </div>
     </div>
   );
 
-  const today = new Date(); today.setHours(0,0,0,0);
+  const todayStr = new Date().toISOString().split("T")[0];
+  const loadInDay = show.loadInDate || show.date;
+  const canStart = !show.showActive && !show.closedAt && loadInDay && todayStr >= loadInDay;
+  const canClose = show.showActive;
+  const checkItems = show.checklist || [];
+  const checkDone = checkItems.filter(c => c.checked).length;
+  const checkPct = checkItems.length > 0 ? Math.round((checkDone / checkItems.length) * 100) : 0;
+  const daysUntil = show.date ? Math.ceil((new Date(show.date) - today) / (1000*60*60*24)) : null;
+  function toggleCheckItem(id) { onUpdateShow({ ...show, checklist:checkItems.map(c => c.id===id ? { ...c, checked:!c.checked } : c) }); }
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.55)", zIndex:1000, display:"flex", alignItems:"flex-end", justifyContent:"center" }}
+    <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.55)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background:"#fff", borderRadius:"22px 22px 0 0", width:"100%", maxWidth:660, maxHeight:"92vh", overflowY:"auto", boxShadow:"0 -8px 40px rgba(0,0,0,0.2)" }}>
-        <div style={{ background:"#1B3A5C", padding:"24px 28px", display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
-          <div>
-            <h2 style={{ margin:0, color:"#fff", fontFamily:"'Playfair Display',serif", fontSize:26, lineHeight:1.2 }}>{show.name}</h2>
-            <div style={{ marginTop:10 }}><StatusBadge status={show.status} large /></div>
+      <div style={{ background:"#fff", borderRadius:22, width:"100%", maxWidth:900, maxHeight:"92vh", display:"flex", flexDirection:"column", boxShadow:"0 20px 60px rgba(0,0,0,0.3)", overflow:"hidden" }}>
+
+        {/* ── Header ── */}
+        <div style={{ background:"#1B3A5C", padding:"18px 28px", display:"flex", alignItems:"center", gap:14, flexShrink:0 }}>
+          <div style={{ flex:1 }}>
+            <h2 style={{ color:"#fff", fontFamily:"'Playfair Display',serif", fontSize:24, margin:0, lineHeight:1.2 }}>{show.name}</h2>
+            <div style={{ marginTop:8 }}><StatusBadge status={show.status} large /></div>
           </div>
-          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", fontSize:22, cursor:"pointer", borderRadius:"50%", width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>×</button>
-        </div>
-        {/* ── Show Lifecycle bar ── */}
-        {(() => {
-          const todayStr = new Date().toISOString().split("T")[0];
-          const loadInDay = show.loadInDate || show.date;
-          const canStart = !show.showActive && !show.closedAt && loadInDay && todayStr >= loadInDay;
-          const canClose = show.showActive;
-          if (!canStart && !canClose) return null;
-          return (
-            <div style={{ background: canClose ? "#ECFDF5" : "#FFF7ED", borderBottom:"1px solid " + (canClose ? "#6EE7B7" : "#FCD34D"), padding:"14px 28px", display:"flex", alignItems:"center", justifyContent:"space-between", gap:12 }}>
-              <div>
-                {canClose
-                  ? <><span style={{ fontSize:16 }}>🟢</span> <strong style={{ color:"#065F46" }}>Show is LIVE</strong> <span style={{ fontSize:13, color:"#6B7280", marginLeft:6 }}>— {show.leadCount||0} leads · {show.appointmentCount||0} appts</span></>
-                  : <><span style={{ fontSize:16 }}>📋</span> <strong style={{ color:"#92400E" }}>Ready to start</strong> <span style={{ fontSize:13, color:"#6B7280", marginLeft:6 }}>Load-in day has arrived!</span></>
-                }
-              </div>
-              {canClose
-                ? <button onClick={() => { const u = { ...show, showActive:false, closedAt:new Date().toISOString() }; onUpdateShow(u); if(onImmediateSave) onImmediateSave(u); }}
-                    style={{ background:"#DC2626", color:"#fff", border:"none", borderRadius:9, padding:"9px 18px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
-                    🔴 Close Show
-                  </button>
-                : <button onClick={() => { const u = { ...show, showActive:true, startedAt:new Date().toISOString() }; onUpdateShow(u); if(onImmediateSave) onImmediateSave(u); }}
-                    style={{ background:"#059669", color:"#fff", border:"none", borderRadius:9, padding:"9px 18px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
-                    🟢 Start Show
-                  </button>
-              }
+          <div style={{ display:"flex", gap:8 }}>
+            <div style={{ background:"rgba(255,255,255,0.12)", borderRadius:10, padding:"8px 16px", textAlign:"center", minWidth:58 }}>
+              <div style={{ fontSize:20, fontWeight:800, color:"#fff", fontFamily:"'Playfair Display',serif", lineHeight:1 }}>{show.leadCount||0}</div>
+              <div style={{ fontSize:11, color:"rgba(255,255,255,0.6)", fontWeight:600, marginTop:3 }}>Leads</div>
             </div>
-          );
-        })()}
-        <div style={{ padding:28 }}>
-          <p style={{ margin:"0 0 4px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Show Details</p>
-          <Row label="Date" value={fmtDateRange(show.date, show.endDate)} />
-          <Row label="Time" value={show.startTime && show.endTime ? show.startTime + " – " + show.endTime : null} />
-          {(show.loadInDate || show.loadInTime) && <Row label="Load In" value={[show.loadInDate ? fmtDate(show.loadInDate) : null, show.loadInTime || null].filter(Boolean).join(" at ")} />}
-          {(show.tearDownDate || show.tearDownTime) && <Row label="Tear Down" value={[show.tearDownDate ? fmtDate(show.tearDownDate) : null, show.tearDownTime || null].filter(Boolean).join(" at ")} />}
-          <Row label="Category" value={show.category} />
-          {(show.street || show.city) && (() => {
-            const full = [show.street, show.city, show.state, show.zip].filter(Boolean).join(", ");
-            const mapsUrl = "https://maps.google.com/?q=" + encodeURIComponent(full);
-            return (
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", padding:"11px 0", borderBottom:"1px solid #F5EDE3" }}>
-                <span style={{ fontSize:15, color:"#6B7280", fontWeight:500 }}>Address</span>
-                <div style={{ textAlign:"right", maxWidth:"65%" }}>
-                  <div style={{ fontSize:15, color:"#1F2937", fontWeight:700, lineHeight:1.4 }}>
-                    {show.street && <div>{show.street}</div>}
-                    <div>{[show.city, show.state, show.zip].filter(Boolean).join(", ")}</div>
-                  </div>
-                  <a href={mapsUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                    style={{ display:"inline-flex", alignItems:"center", gap:5, marginTop:6, fontSize:13, color:"#2563EB", fontWeight:700, textDecoration:"none", background:"#EFF6FF", border:"1px solid #93C5FD", borderRadius:7, padding:"4px 10px" }}>
-                    📍 Get Directions
-                  </a>
-                </div>
-              </div>
-            );
-          })()}
-          <Row label="Booth Size" value={show.boothSize} />
-          <Row label="Expected Attendance" value={show.expectedParticipation ? Number(show.expectedParticipation).toLocaleString() : null} />
-          <Row label="Location" value={show.isIndoor ? "Indoor" : "Outdoor"} />
-          <Row label="Electrical" value={show.hasElectrical ? "Yes" : "No"} />
-          <Row label="Trailer" value={show.needsTrailer ? "Yes" : "No"} />
-
-          <p style={{ margin:"20px 0 4px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Contact</p>
-          <Row label="Name" value={show.contactName} />
-          <Row label="Email" value={show.contactEmail} />
-          <Row label="Phone" value={show.contactPhone} />
-
-          <p style={{ margin:"20px 0 4px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Financials</p>
-          <FinRow label="Total Show Cost (including add ons)" amount={fmtMoney(show.totalDue)} date={show.finalPaymentDueDate} />
-          <FinRow label="Deposit Due"           amount={fmtMoney(show.depositDue)} date={show.depositDueDate} />
-          <FinRow label="Deposit Paid"          amount={fmtMoney(show.depositPaid)} date={show.depositPaidDate} accent="#059669" />
-          <FinRow label="Balance / Final"       amount={fmtMoney(show.totalPaid)}  date={show.totalPaidDate} accent={(+show.totalPaid||0)>0?"#059669":undefined} />
-          <div style={{ borderTop:"2px dashed #EDE6DC", margin:"6px 0 2px" }} />
-          <FinRow label="Total Paid"            amount={fmtMoney(totalPaidCalc)} accent="#059669" />
-          <FinRow label="Remaining Balance"     amount={fmtMoney(balance)} accent={balance > 0 ? "#DC2626" : "#059669"} />
-
-          <InventorySection show={show} onUpdateShow={onUpdateShow} />
-
-          {(+show.contactsCollected || 0) > 0 && <>
-            <p style={{ margin:"20px 0 4px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Show Results</p>
-            <Row label="Contacts Collected" value={(+show.contactsCollected).toLocaleString()} accent="#1B3A5C" />
-          </>}
-
-          <p style={{ margin:"20px 0 12px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>
-            Staff Assigned ({assigned.length} of {show.employeesNeeded || 0} needed)
-          </p>
-          {assigned.length === 0
-            ? <p style={{ color:"#9CA3AF", margin:0 }}>No employees assigned yet.</p>
-            : assigned.map(e => (
-              <div key={e.id} style={{ display:"flex", alignItems:"center", gap:12, marginBottom:10 }}>
-                <div style={{ width:38, height:38, borderRadius:"50%", background:"#1B3A5C", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:700, fontSize:14, flexShrink:0 }}>{e.firstName[0]}{e.lastName[0]}</div>
-                <div>
-                  <div style={{ fontWeight:700, color:"#1F2937", fontSize:15 }}>{e.firstName} {e.lastName}</div>
-                  <div style={{ color:"#6B7280", fontSize:13 }}>{e.phone} · {e.email}</div>
-                </div>
-              </div>
-            ))
-          }
-
-          {show.needToKnow && (
-            <div style={{ marginTop:20, paddingTop:20, borderTop:"2px solid #F0E8DF" }}>
-              <p style={{ margin:"0 0 10px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>📌 Need to Know</p>
-              <div style={{ background:"#FFFBEB", border:"1px solid #FCD34D", borderLeft:"4px solid #F59E0B", borderRadius:10, padding:"14px 16px" }}>
-                <p style={{ margin:0, fontSize:15, color:"#1F2937", lineHeight:1.6, whiteSpace:"pre-wrap" }}>{show.needToKnow}</p>
-              </div>
+            <div style={{ background:"rgba(255,255,255,0.12)", borderRadius:10, padding:"8px 16px", textAlign:"center", minWidth:58 }}>
+              <div style={{ fontSize:20, fontWeight:800, color:"#fff", fontFamily:"'Playfair Display',serif", lineHeight:1 }}>{show.appointmentCount||0}</div>
+              <div style={{ fontSize:11, color:"rgba(255,255,255,0.6)", fontWeight:600, marginTop:3 }}>Appts</div>
             </div>
+          </div>
+          {(canStart || canClose) && (canClose
+            ? <button onClick={() => { const u={...show,showActive:false,closedAt:new Date().toISOString()}; onUpdateShow(u); if(onImmediateSave) onImmediateSave(u); }}
+                style={{ background:"#DC2626", color:"#fff", border:"none", borderRadius:9, padding:"9px 18px", fontSize:13, fontWeight:700, cursor:"pointer", flexShrink:0 }}>🔴 Close Show</button>
+            : <button onClick={() => { const u={...show,showActive:true,startedAt:new Date().toISOString()}; onUpdateShow(u); if(onImmediateSave) onImmediateSave(u); }}
+                style={{ background:"#059669", color:"#fff", border:"none", borderRadius:9, padding:"9px 18px", fontSize:13, fontWeight:700, cursor:"pointer", flexShrink:0 }}>🟢 Start Show</button>
           )}
+          <button onClick={onClose} style={{ background:"rgba(255,255,255,0.15)", border:"none", color:"#fff", fontSize:20, cursor:"pointer", borderRadius:"50%", width:32, height:32, display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>×</button>
+        </div>
 
-          {(show.employeeReports || []).length > 0 && (() => {
-            const reports = show.employeeReports;
-            const totalLeads = reports.reduce((a,r) => a + (+r.leadsAcquired||0), 0);
-            const totalAppts = reports.reduce((a,r) => a + (+r.appointmentsBooked||0), 0);
-            return (
-              <div style={{ marginTop:20, paddingTop:20, borderTop:"2px solid #F0E8DF" }}>
-                <p style={{ margin:"0 0 12px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Employee Reports ({reports.length})</p>
-                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:14 }}>
-                  <div style={{ background:"#EFF6FF", borderRadius:10, padding:"12px 16px" }}>
-                    <div style={{ fontSize:22, fontWeight:700, color:"#1E40AF", fontFamily:"'Playfair Display',serif" }}>{totalLeads}</div>
-                    <div style={{ fontSize:14, color:"#6B7280", marginTop:2 }}>Total Contacts</div>
-                  </div>
-                  <div style={{ background:"#ECFDF5", borderRadius:10, padding:"12px 16px" }}>
-                    <div style={{ fontSize:22, fontWeight:700, color:"#059669", fontFamily:"'Playfair Display',serif" }}>{totalAppts}</div>
-                    <div style={{ fontSize:14, color:"#6B7280", marginTop:2 }}>Appointments Booked</div>
-                  </div>
-                </div>
-                {reports.map(r => (
-                  <div key={r.employeeId} style={{ background:"#F7F2EB", borderRadius:10, padding:"12px 14px", marginBottom:8 }}>
-                    <div style={{ fontWeight:700, fontSize:14, color:"#1F2937", marginBottom:4 }}>{r.employeeName}</div>
-                    <div style={{ fontSize:13, color:"#4B5563" }}>Contacts: <b>{r.leadsAcquired}</b> · Appointments: <b>{r.appointmentsBooked}</b></div>
-                    {r.futureNotes && <div style={{ fontSize:13, color:"#6B7280", marginTop:6, fontStyle:"italic" }}>"{r.futureNotes}"</div>}
-                  </div>
-                ))}
+        {/* ── Need to Know (full width, pinned below header) ── */}
+        {show.needToKnow && (
+          <div style={{ background:"#FFFBEB", borderBottom:"1px solid #FCD34D", padding:"10px 28px", flexShrink:0 }}>
+            <div style={{ display:"flex", gap:10, alignItems:"flex-start" }}>
+              <span style={{ fontSize:16, flexShrink:0, marginTop:2 }}>📌</span>
+              <div>
+                <div style={{ fontSize:11, fontWeight:700, color:"#92400E", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:2 }}>Need to Know</div>
+                <p style={{ margin:0, fontSize:14, color:"#1F2937", lineHeight:1.6, whiteSpace:"pre-wrap" }}>{show.needToKnow}</p>
               </div>
-            );
-          })()}
+            </div>
+          </div>
+        )}
 
-          {(show.status === "countdown" || show.status === "complete") && (show.checklist||[]).length > 0 && (() => {
-            const items = show.checklist;
-            const done = items.filter(c => c.checked).length;
-            const pct = Math.round((done / items.length) * 100);
-            const daysUntil = show.date ? Math.ceil((new Date(show.date) - today) / (1000*60*60*24)) : null;
-            function toggleItem(id) { onUpdateShow({ ...show, checklist:items.map(c => c.id===id ? { ...c, checked:!c.checked } : c) }); }
-            return (
-              <div style={{ marginTop:24, borderTop:"2px solid #F0E8DF", paddingTop:20 }}>
-                <div style={{ background:done===items.length?"#ECFDF5":"#FFF1F2", border:"1px solid " + (done===items.length?"#6EE7B7":"#FCA5A5"), borderRadius:12, padding:"12px 16px", marginBottom:16, display:"flex", alignItems:"center", gap:12 }}>
-                  <span style={{ fontSize:22 }}>{done===items.length ? "🎉" : "🚨"}</span>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontWeight:700, fontSize:15, color:done===items.length?"#065F46":"#991B1B" }}>
-                      {done===items.length ? "All set — you're ready for showtime!" : daysUntil != null && daysUntil >= 0 ? "Final Countdown — " + (daysUntil===0?"Today is showtime!":daysUntil===1?"Tomorrow is showtime!":daysUntil+" days to showtime!") : "Pre-Show Checklist"}
+        {/* ── Two-column body ── */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", flex:"1 1 0", minHeight:0, overflow:"hidden" }}>
+
+          {/* LEFT — Show Details + Contact */}
+          <div style={{ overflowY:"auto", padding:"18px 24px", borderRight:"1px solid #EDE6DC" }}>
+            <p style={{ margin:"0 0 6px", fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Show Details</p>
+            <Row label="Date" value={fmtDateRange(show.date, show.endDate)} />
+            <Row label="Time" value={show.startTime && show.endTime ? show.startTime + " – " + show.endTime : null} />
+            {(show.loadInDate || show.loadInTime) && <Row label="Load In" value={[show.loadInDate ? fmtDate(show.loadInDate) : null, show.loadInTime || null].filter(Boolean).join(" at ")} />}
+            {(show.tearDownDate || show.tearDownTime) && <Row label="Tear Down" value={[show.tearDownDate ? fmtDate(show.tearDownDate) : null, show.tearDownTime || null].filter(Boolean).join(" at ")} />}
+            <Row label="Category" value={show.category} />
+            {(show.street || show.city) && (() => {
+              const full = [show.street, show.city, show.state, show.zip].filter(Boolean).join(", ");
+              const mapsUrl = "https://maps.google.com/?q=" + encodeURIComponent(full);
+              return (
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", padding:"9px 0", borderBottom:"1px solid #F5EDE3" }}>
+                  <span style={{ fontSize:14, color:"#6B7280", fontWeight:500 }}>Address</span>
+                  <div style={{ textAlign:"right", maxWidth:"65%" }}>
+                    <div style={{ fontSize:14, color:"#1F2937", fontWeight:700, lineHeight:1.4 }}>
+                      {show.street && <div>{show.street}</div>}
+                      <div>{[show.city, show.state, show.zip].filter(Boolean).join(", ")}</div>
                     </div>
-                    <div style={{ fontSize:13, color:"#6B7280", marginTop:2 }}>{done} of {items.length} items completed</div>
+                    <a href={mapsUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
+                      style={{ display:"inline-flex", alignItems:"center", gap:5, marginTop:5, fontSize:12, color:"#2563EB", fontWeight:700, textDecoration:"none", background:"#EFF6FF", border:"1px solid #93C5FD", borderRadius:6, padding:"3px 9px" }}>
+                      📍 Get Directions
+                    </a>
                   </div>
-                  <div style={{ fontSize:20, fontWeight:700, color:done===items.length?"#059669":"#DC2626" }}>{pct}%</div>
                 </div>
-                <div style={{ height:8, background:"#F3EDE6", borderRadius:4, marginBottom:16, overflow:"hidden" }}>
-                  <div style={{ height:"100%", width:pct+"%", background:done===items.length?"#10B981":"#EF4444", borderRadius:4, transition:"width 0.3s" }} />
-                </div>
-                {items.map(item => (
-                  <div key={item.id} onClick={() => toggleItem(item.id)}
-                    style={{ display:"flex", alignItems:"center", gap:14, padding:"11px 14px", borderRadius:10, marginBottom:6, cursor:"pointer",
-                      background:item.checked?"#ECFDF5":"#fff", border:"1px solid " + (item.checked?"#6EE7B7":"#EDE6DC"), transition:"all 0.15s" }}>
-                    <div style={{ width:24, height:24, borderRadius:6, border:"2px solid " + (item.checked?"#10B981":"#D1C8BB"),
-                      background:item.checked?"#10B981":"#fff", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                      {item.checked && <span style={{ color:"#fff", fontSize:14, fontWeight:700, lineHeight:1 }}>✓</span>}
+              );
+            })()}
+            <Row label="Booth Size" value={show.boothSize} />
+            <Row label="Expected Attendance" value={show.expectedParticipation ? Number(show.expectedParticipation).toLocaleString() : null} />
+            <Row label="Location" value={show.isIndoor ? "Indoor" : "Outdoor"} />
+            {(show.hasElectrical || show.needsTrailer) && (
+              <div style={{ padding:"9px 0", borderBottom:"1px solid #F5EDE3", display:"flex", gap:6, flexWrap:"wrap" }}>
+                {show.hasElectrical && <span style={{ fontSize:12, background:"#FFFBEB", color:"#B45309", border:"1px solid #FCD34D", borderRadius:6, padding:"3px 10px", fontWeight:700 }}>⚡ Electrical</span>}
+                {show.needsTrailer && <span style={{ fontSize:12, background:"#F0FDF4", color:"#166534", border:"1px solid #6EE7B7", borderRadius:6, padding:"3px 10px", fontWeight:700 }}>🚛 Trailer</span>}
+              </div>
+            )}
+            <p style={{ margin:"18px 0 6px", fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Contact</p>
+            <Row label="Name" value={show.contactName} />
+            <Row label="Email" value={show.contactEmail} />
+            <Row label="Phone" value={show.contactPhone} />
+            {(+show.contactsCollected || 0) > 0 && <>
+              <p style={{ margin:"18px 0 6px", fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Show Results</p>
+              <Row label="Contacts Collected" value={(+show.contactsCollected).toLocaleString()} accent="#1B3A5C" />
+            </>}
+          </div>
+
+          {/* RIGHT — Widgets */}
+          <div style={{ overflowY:"auto", padding:"14px 18px" }}>
+
+          {/* Financials Widget */}
+            <Widget icon="💰" title="Financials" summary={balance > 0 ? `${fmtMoney(balance)} remaining` : "Paid in full ✓"} defaultOpen={true}>
+              <FinRow label="Total Show Cost" amount={fmtMoney(show.totalDue)} date={show.finalPaymentDueDate} />
+              <FinRow label="Deposit Due"     amount={fmtMoney(show.depositDue)} date={show.depositDueDate} />
+              <FinRow label="Deposit Paid"    amount={fmtMoney(show.depositPaid)} date={show.depositPaidDate} accent="#059669" />
+              <FinRow label="Balance / Final" amount={fmtMoney(show.totalPaid)} date={show.totalPaidDate} accent={(+show.totalPaid||0)>0?"#059669":undefined} />
+              <div style={{ borderTop:"2px dashed #EDE6DC", margin:"6px 0 2px" }} />
+              <FinRow label="Total Paid"  amount={fmtMoney(totalPaidCalc)} accent="#059669" />
+              <FinRow label="Remaining"   amount={fmtMoney(balance)} accent={balance > 0 ? "#DC2626" : "#059669"} />
+            </Widget>
+
+            {/* Staff + Shifts Widget */}
+            <Widget icon="👥" title="Staff & Shifts" summary={`${assigned.length} of ${show.employeesNeeded||0} needed assigned`} defaultOpen={true}>
+              {assigned.length === 0
+                ? <p style={{ color:"#9CA3AF", margin:"0 0 14px", fontSize:14 }}>No employees assigned yet.</p>
+                : <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:14 }}>
+                    {assigned.map(e => (
+                      <div key={e.id} style={{ display:"flex", alignItems:"center", gap:8, background:"#F7F2EB", border:"1px solid #EDE6DC", borderRadius:20, padding:"5px 12px" }}>
+                        <div style={{ width:28, height:28, borderRadius:"50%", background:"#1B3A5C", display:"flex", alignItems:"center", justifyContent:"center", color:"#fff", fontWeight:700, fontSize:11, flexShrink:0 }}>{e.firstName[0]}{e.lastName[0]}</div>
+                        <div>
+                          <div style={{ fontWeight:700, color:"#1F2937", fontSize:13 }}>{e.firstName} {e.lastName}</div>
+                          <div style={{ color:"#6B7280", fontSize:11 }}>{e.phone}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+              }
+              <ShiftScheduler show={show} employees={employees} onUpdateShow={onUpdateShow} />
+            </Widget>
+
+            {/* Checklist Widget */}
+            {(show.status === "countdown" || show.status === "complete") && checkItems.length > 0 && (
+              <Widget icon="✅" title="Pre-Show Checklist" summary={`${checkDone}/${checkItems.length} complete · ${checkPct}%`} defaultOpen={checkPct < 100}>
+                <div style={{ background:checkDone===checkItems.length?"#ECFDF5":"#FFF1F2", border:"1px solid "+(checkDone===checkItems.length?"#6EE7B7":"#FCA5A5"), borderRadius:10, padding:"10px 14px", marginBottom:12, display:"flex", alignItems:"center", gap:10 }}>
+                  <span style={{ fontSize:18 }}>{checkDone===checkItems.length?"🎉":"🚨"}</span>
+                  <div style={{ flex:1 }}>
+                    <div style={{ fontWeight:700, fontSize:14, color:checkDone===checkItems.length?"#065F46":"#991B1B" }}>
+                      {checkDone===checkItems.length?"All set — ready for showtime!":daysUntil!=null&&daysUntil>=0?(daysUntil===0?"Today is showtime!":daysUntil===1?"Tomorrow is showtime!":daysUntil+" days to showtime!"):"Pre-Show Checklist"}
                     </div>
-                    <span style={{ fontSize:15, color:item.checked?"#6B7280":"#1F2937", fontWeight:item.checked?400:500, textDecoration:item.checked?"line-through":"none", lineHeight:1.4 }}>
+                    <div style={{ fontSize:12, color:"#6B7280" }}>{checkDone} of {checkItems.length} items done</div>
+                  </div>
+                  <div style={{ fontSize:18, fontWeight:700, color:checkDone===checkItems.length?"#059669":"#DC2626" }}>{checkPct}%</div>
+                </div>
+                <div style={{ height:6, background:"#F3EDE6", borderRadius:4, marginBottom:12, overflow:"hidden" }}>
+                  <div style={{ height:"100%", width:checkPct+"%", background:checkDone===checkItems.length?"#10B981":"#EF4444", borderRadius:4, transition:"width 0.3s" }} />
+                </div>
+                {checkItems.map(item => (
+                  <div key={item.id} onClick={() => toggleCheckItem(item.id)}
+                    style={{ display:"flex", alignItems:"center", gap:12, padding:"9px 12px", borderRadius:9, marginBottom:5, cursor:"pointer",
+                      background:item.checked?"#ECFDF5":"#fff", border:"1px solid "+(item.checked?"#6EE7B7":"#EDE6DC") }}>
+                    <div style={{ width:22, height:22, borderRadius:5, border:"2px solid "+(item.checked?"#10B981":"#D1C8BB"),
+                      background:item.checked?"#10B981":"#fff", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                      {item.checked && <span style={{ color:"#fff", fontSize:12, fontWeight:700 }}>✓</span>}
+                    </div>
+                    <span style={{ fontSize:14, color:item.checked?"#6B7280":"#1F2937", fontWeight:item.checked?400:500, textDecoration:item.checked?"line-through":"none" }}>
                       {item.label}
                     </span>
                   </div>
                 ))}
-              </div>
-            );
-          })()}
-
-          {show.status === "complete" && (
-            <div style={{ marginTop:20, paddingTop:20, borderTop:"2px solid #F0E8DF" }}>
-              <p style={{ margin:"0 0 12px", fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>⭐ Show Rating</p>
-              <StarRating value={show.rating} onChange={r => onUpdateShow({ ...show, rating:r })} size={34} />
-              {show.rating && (
-                <textarea value={show.ratingNotes || ""} rows={2} onChange={e => onUpdateShow({ ...show, ratingNotes:e.target.value })}
-                  placeholder="Worth returning? Notes on the organizer, location, or overall experience…"
-                  style={{ width:"100%", marginTop:10, padding:"11px 13px", borderRadius:9, border:"2px solid #EDE6DC", fontSize:14, color:"#1F2937", outline:"none", boxSizing:"border-box", resize:"vertical", fontFamily:"'Nunito',sans-serif", lineHeight:1.5 }} />
-              )}
-            </div>
-          )}
-
-          <ShiftScheduler show={show} employees={employees} onUpdateShow={onUpdateShow} />
-
-          <DocumentsSection show={show} onUpdateShow={onUpdateShow} userId={userId} />
-
-          <div style={{ marginTop:20, paddingTop:22, borderTop:"2px solid #F0E8DF" }}>
-            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
-              <p style={{ margin:0, fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em" }}>Communication Log ({comms.length})</p>
-              {!addingComm && (
-                <button onClick={() => setAddingComm(true)} style={{ background:"#1B3A5C", color:"#fff", border:"none", borderRadius:20, padding:"8px 18px", fontSize:14, fontWeight:700, cursor:"pointer" }}>
-                  + Log Communication
-                </button>
-              )}
-            </div>
-            {addingComm && (
-              <div style={{ background:"#F7F2EB", borderRadius:14, border:"2px solid #1B3A5C", padding:20, marginBottom:18 }}>
-                <p style={{ margin:"0 0 14px", fontWeight:700, fontSize:15, color:"#1B3A5C" }}>Log New Communication</p>
-                <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:14 }}>
-                  {COMM_TYPES.map(t => {
-                    const active = commType === t.value;
-                    const c = COMM_COLORS[t.value];
-                    return (
-                      <button key={t.value} onClick={() => setCommType(t.value)} style={{
-                        padding:"10px 16px", borderRadius:20, border:"2px solid",
-                        borderColor: active ? c.text : "#D1C8BB", background: active ? c.bg : "#fff",
-                        color: active ? c.text : "#6B7280", fontSize:14, fontWeight:700, cursor:"pointer" }}>
-                        {t.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <textarea value={commNote} onChange={e => setCommNote(e.target.value)}
-                  placeholder="What was covered? e.g. Confirmed booth location, asked about load-in time…" rows={3}
-                  style={{ width:"100%", padding:"12px 14px", borderRadius:9, border:"2px solid #EDE6DC", fontSize:15, color:"#1F2937", background:"#fff", outline:"none", boxSizing:"border-box", resize:"vertical", fontFamily:"'Nunito',sans-serif", lineHeight:1.5, marginBottom:16 }} />
-                <div style={{ display:"flex", gap:10 }}>
-                  <button onClick={saveComm} style={{ background:"#1B3A5C", color:"#fff", border:"none", borderRadius:10, padding:"12px 24px", fontSize:15, fontWeight:700, cursor:"pointer" }}>Save Entry</button>
-                  <button onClick={() => { setAddingComm(false); setCommNote(""); setCommType("call"); }}
-                    style={{ background:"#fff", color:"#6B7280", border:"2px solid #EDE6DC", borderRadius:10, padding:"12px 20px", fontSize:15, cursor:"pointer", fontWeight:600 }}>Cancel</button>
-                </div>
-              </div>
+              </Widget>
             )}
-            {comms.length === 0 && !addingComm
-              ? <div style={{ textAlign:"center", padding:"28px 0", color:"#9CA3AF" }}>
-                  <div style={{ fontSize:32, marginBottom:8 }}>💬</div>
-                  <p style={{ margin:0, fontSize:15 }}>No communications logged yet.</p>
-                </div>
-              : comms.map(c => {
-                  const col = COMM_COLORS[c.type] || COMM_COLORS.other;
-                  return (
-                    <div key={c.id} style={{ background:col.bg, border:"1px solid " + col.border, borderLeft:"4px solid " + col.border, borderRadius:12, padding:"14px 16px", marginBottom:12 }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:6 }}>
-                        <div style={{ display:"flex", alignItems:"center", gap:8 }}>
-                          <span style={{ fontSize:18 }}>{COMM_ICONS[c.type]||"📝"}</span>
-                          <span style={{ fontSize:14, fontWeight:700, color:col.text }}>{COMM_TYPES.find(t => t.value===c.type)?.label.replace(/.*  /,"") || "Other"}</span>
-                          <span style={{ fontSize:13, color:"#9CA3AF" }}>· {fmtDateTime(c.datetime)}</span>
-                        </div>
-                        <button onClick={() => deleteComm(c.id)}
-                          style={{ background:"none", border:"none", color:"#D1D5DB", fontSize:17, cursor:"pointer", lineHeight:1, padding:2, flexShrink:0 }}
-                          onMouseEnter={e => e.currentTarget.style.color="#EF4444"}
-                          onMouseLeave={e => e.currentTarget.style.color="#D1D5DB"}>×</button>
-                      </div>
-                      <p style={{ margin:0, fontSize:15, color:"#1F2937", lineHeight:1.55 }}>{c.notes}</p>
-                    </div>
-                  );
-                })
-            }
-          </div>
 
-          <div style={{ display:"flex", gap:10, marginTop:20 }}>
-            <button onClick={onEdit} style={{ flex:1, padding:"14px", borderRadius:12, border:"none", background:"#1B3A5C", color:"#fff", fontSize:16, fontWeight:700, cursor:"pointer" }}>✏️ Edit</button>
-            <button onClick={onDuplicate}
-              style={{ padding:"14px 18px", borderRadius:12, border:"2px solid #EDE6DC", background:"#fff", color:"#6B7280", fontSize:15, fontWeight:700, cursor:"pointer" }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor="#1B3A5C"; e.currentTarget.style.color="#1B3A5C"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor="#EDE6DC"; e.currentTarget.style.color="#6B7280"; }}>
-              ⧉ Duplicate
-            </button>
-          </div>
+            {/* Employee Reports Widget */}
+            {(show.employeeReports||[]).length > 0 && (() => {
+              const reports = show.employeeReports;
+              const totalLeads = reports.reduce((a,r) => a+(+r.leadsAcquired||0), 0);
+              const totalAppts = reports.reduce((a,r) => a+(+r.appointmentsBooked||0), 0);
+              return (
+                <Widget icon="📊" title="Employee Reports" summary={`${totalLeads} contacts · ${totalAppts} appts`}>
+                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:12 }}>
+                    <div style={{ background:"#EFF6FF", borderRadius:9, padding:"10px 14px" }}>
+                      <div style={{ fontSize:20, fontWeight:700, color:"#1E40AF", fontFamily:"'Playfair Display',serif" }}>{totalLeads}</div>
+                      <div style={{ fontSize:12, color:"#6B7280", marginTop:2 }}>Total Contacts</div>
+                    </div>
+                    <div style={{ background:"#ECFDF5", borderRadius:9, padding:"10px 14px" }}>
+                      <div style={{ fontSize:20, fontWeight:700, color:"#059669", fontFamily:"'Playfair Display',serif" }}>{totalAppts}</div>
+                      <div style={{ fontSize:12, color:"#6B7280", marginTop:2 }}>Appts Booked</div>
+                    </div>
+                  </div>
+                  {reports.map(r => (
+                    <div key={r.employeeId} style={{ background:"#F7F2EB", borderRadius:9, padding:"10px 12px", marginBottom:7 }}>
+                      <div style={{ fontWeight:700, fontSize:13, color:"#1F2937", marginBottom:3 }}>{r.employeeName}</div>
+                      <div style={{ fontSize:12, color:"#4B5563" }}>Contacts: <b>{r.leadsAcquired}</b> · Appointments: <b>{r.appointmentsBooked}</b></div>
+                      {r.futureNotes && <div style={{ fontSize:12, color:"#6B7280", marginTop:5, fontStyle:"italic" }}>"{r.futureNotes}"</div>}
+                    </div>
+                  ))}
+                </Widget>
+              );
+            })()}
+
+            {/* Show Rating Widget */}
+            {show.status === "complete" && (
+              <Widget icon="⭐" title="Show Rating" summary={show.rating ? "★".repeat(show.rating) : "Not yet rated"}>
+                <StarRating value={show.rating} onChange={r => onUpdateShow({ ...show, rating:r })} size={30} />
+                {show.rating && (
+                  <textarea value={show.ratingNotes||""} rows={2} onChange={e => onUpdateShow({ ...show, ratingNotes:e.target.value })}
+                    placeholder="Worth returning? Notes on the organizer, location, or overall experience…"
+                    style={{ width:"100%", marginTop:10, padding:"10px 12px", borderRadius:8, border:"2px solid #EDE6DC", fontSize:14, color:"#1F2937", outline:"none", boxSizing:"border-box", resize:"vertical", fontFamily:"'Nunito',sans-serif", lineHeight:1.5 }} />
+                )}
+              </Widget>
+            )}
+
+            {/* Inventory Widget */}
+            <Widget icon="📦" title="Inventory">
+              <InventorySection show={show} onUpdateShow={onUpdateShow} />
+            </Widget>
+
+            {/* Documents Widget */}
+            <Widget icon="📄" title="Documents">
+              <DocumentsSection show={show} onUpdateShow={onUpdateShow} userId={userId} />
+            </Widget>
+
+            {/* Communications Widget */}
+            <Widget icon="💬" title="Communication Log" summary={comms.length > 0 ? `${comms.length} logged` : "None logged"}>
+              <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:12 }}>
+                {!addingComm && (
+                  <button onClick={() => setAddingComm(true)} style={{ background:"#1B3A5C", color:"#fff", border:"none", borderRadius:18, padding:"7px 16px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+                    + Log Communication
+                  </button>
+                )}
+              </div>
+              {addingComm && (
+                <div style={{ background:"#F7F2EB", borderRadius:12, border:"2px solid #1B3A5C", padding:16, marginBottom:14 }}>
+                  <p style={{ margin:"0 0 12px", fontWeight:700, fontSize:14, color:"#1B3A5C" }}>Log New Communication</p>
+                  <div style={{ display:"flex", flexWrap:"wrap", gap:7, marginBottom:12 }}>
+                    {COMM_TYPES.map(t => {
+                      const active = commType === t.value;
+                      const c = COMM_COLORS[t.value];
+                      return (
+                        <button key={t.value} onClick={() => setCommType(t.value)} style={{
+                          padding:"8px 14px", borderRadius:18, border:"2px solid",
+                          borderColor: active ? c.text : "#D1C8BB", background: active ? c.bg : "#fff",
+                          color: active ? c.text : "#6B7280", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+                          {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <textarea value={commNote} onChange={e => setCommNote(e.target.value)}
+                    placeholder="What was covered? e.g. Confirmed booth location, asked about load-in time…" rows={3}
+                    style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:"2px solid #EDE6DC", fontSize:14, color:"#1F2937", background:"#fff", outline:"none", boxSizing:"border-box", resize:"vertical", fontFamily:"'Nunito',sans-serif", lineHeight:1.5, marginBottom:12 }} />
+                  <div style={{ display:"flex", gap:8 }}>
+                    <button onClick={saveComm} style={{ background:"#1B3A5C", color:"#fff", border:"none", borderRadius:9, padding:"10px 20px", fontSize:14, fontWeight:700, cursor:"pointer" }}>Save Entry</button>
+                    <button onClick={() => { setAddingComm(false); setCommNote(""); setCommType("call"); }}
+                      style={{ background:"#fff", color:"#6B7280", border:"2px solid #EDE6DC", borderRadius:9, padding:"10px 16px", fontSize:14, cursor:"pointer", fontWeight:600 }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+              {comms.length === 0 && !addingComm
+                ? <div style={{ textAlign:"center", padding:"20px 0", color:"#9CA3AF" }}>
+                    <div style={{ fontSize:28, marginBottom:6 }}>💬</div>
+                    <p style={{ margin:0, fontSize:14 }}>No communications logged yet.</p>
+                  </div>
+                : comms.map(c => {
+                    const col = COMM_COLORS[c.type] || COMM_COLORS.other;
+                    return (
+                      <div key={c.id} style={{ background:col.bg, border:"1px solid "+col.border, borderLeft:"4px solid "+col.border, borderRadius:10, padding:"12px 14px", marginBottom:10 }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:5 }}>
+                          <div style={{ display:"flex", alignItems:"center", gap:7 }}>
+                            <span style={{ fontSize:16 }}>{COMM_ICONS[c.type]||"📝"}</span>
+                            <span style={{ fontSize:13, fontWeight:700, color:col.text }}>{COMM_TYPES.find(t => t.value===c.type)?.label.replace(/.*  /,"") || "Other"}</span>
+                            <span style={{ fontSize:12, color:"#9CA3AF" }}>· {fmtDateTime(c.datetime)}</span>
+                          </div>
+                          <button onClick={() => deleteComm(c.id)}
+                            style={{ background:"none", border:"none", color:"#D1D5DB", fontSize:16, cursor:"pointer", lineHeight:1, padding:2, flexShrink:0 }}
+                            onMouseEnter={e => e.currentTarget.style.color="#EF4444"}
+                            onMouseLeave={e => e.currentTarget.style.color="#D1D5DB"}>×</button>
+                        </div>
+                        <p style={{ margin:0, fontSize:14, color:"#1F2937", lineHeight:1.55 }}>{c.notes}</p>
+                      </div>
+                    );
+                  })
+              }
+            </Widget>
+
+          </div>{/* end right widgets column */}
+        </div>{/* end two-column grid */}
+
+        {/* ── Action row ── */}
+        <div style={{ display:"flex", gap:10, padding:"14px 28px", borderTop:"2px solid #EDE6DC", flexShrink:0, background:"#FAFAF9" }}>
+          <button onClick={onEdit} style={{ flex:1, padding:"13px", borderRadius:11, border:"none", background:"#1B3A5C", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>✏️ Edit Show</button>
+          <button onClick={onDuplicate}
+            style={{ padding:"13px 18px", borderRadius:11, border:"2px solid #EDE6DC", background:"#fff", color:"#6B7280", fontSize:14, fontWeight:700, cursor:"pointer" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor="#1B3A5C"; e.currentTarget.style.color="#1B3A5C"; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor="#EDE6DC"; e.currentTarget.style.color="#6B7280"; }}>
+            ⧉ Duplicate
+          </button>
         </div>
+
+        {ConfirmDialog}
       </div>
-      {ConfirmDialog}
     </div>
   );
 }
