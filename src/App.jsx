@@ -2746,8 +2746,9 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
     (s.assignedEmployees||[]).includes(emp.id) ||
     (s.shifts||[]).some(sh => (sh.assignedEmployees||[]).includes(emp.id))
   );
-  const upcoming  = myShows.filter(s => s.status !== "complete" && s.date >= todayStr).sort((a,b) => a.date.localeCompare(b.date));
-  const completed = myShows.filter(s => s.status === "complete").sort((a,b) => b.date.localeCompare(a.date));
+  const activeShows   = myShows.filter(s => s.showActive).sort((a,b) => a.date.localeCompare(b.date));
+  const upcoming      = myShows.filter(s => !s.showActive && !s.closedAt && s.date >= todayStr).sort((a,b) => a.date.localeCompare(b.date));
+  const completed     = myShows.filter(s => s.closedAt || s.status === "complete").sort((a,b) => b.date.localeCompare(a.date));
   const notifications = myShows.filter(s => notifTiming==="assigned" ? s.status!=="complete" : s.status==="countdown");
 
   return (
@@ -2772,7 +2773,78 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
           </div>
         </div>
       )}
-      <h2 style={{ fontSize:19, fontFamily:"'Playfair Display',serif", color:"#1B3A5C", margin:"0 0 14px", display:"flex", alignItems:"center", gap:8 }}>
+      {/* ── Active Shows ── */}
+      {activeShows.length > 0 && (<>
+        <h2 style={{ fontSize:19, fontFamily:"'Playfair Display',serif", color:"#065F46", margin:"0 0 14px", display:"flex", alignItems:"center", gap:8 }}>
+          🟢 Active Shows
+          <span style={{ fontSize:13, fontWeight:700, background:"#DCFCE7", color:"#065F46", borderRadius:10, padding:"2px 9px" }}>{activeShows.length}</span>
+        </h2>
+        {activeShows.map(show => {
+          const mapsAddr = [show.street, show.city, show.state, show.zip].filter(Boolean).join(", ");
+          const mapsUrl  = mapsAddr ? "https://maps.google.com/?q=" + encodeURIComponent(mapsAddr) : null;
+          const teammates = (show.assignedEmployees||[]).filter(id=>id!==emp.id).map(id=>employees.find(e=>e.id===id)).filter(Boolean);
+          return (
+            <div key={show.id} style={{ background:"#fff", borderRadius:14, border:"2px solid #4ADE80", borderLeft:"5px solid #16A34A", padding:"18px 20px", marginBottom:12, boxShadow:"0 2px 12px rgba(22,163,74,0.1)" }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:10 }}>
+                <div>
+                  <div style={{ fontWeight:700, fontSize:17, color:"#1F2937" }}>{show.name}</div>
+                  {show.category && <div style={{ fontSize:13, color:"#9CA3AF", marginTop:3 }}>{show.category}</div>}
+                </div>
+                <span style={{ fontSize:12, fontWeight:700, background:"#DCFCE7", color:"#15803D", borderRadius:20, padding:"4px 10px" }}>🟢 LIVE</span>
+              </div>
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+                <div style={{ background:"#F0FDF4", borderRadius:9, padding:"10px 14px" }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:3 }}>Date</div>
+                  <div style={{ fontSize:15, fontWeight:700, color:"#1F2937" }}>{fmtDateRange(show.date, show.endDate)}</div>
+                </div>
+                <div style={{ background:"#F0FDF4", borderRadius:9, padding:"10px 14px" }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:3 }}>Time</div>
+                  <div style={{ fontSize:15, fontWeight:700, color:"#1F2937" }}>{show.startTime||"TBD"} – {show.endTime||"TBD"}</div>
+                </div>
+              </div>
+              {mapsAddr && (
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:"#EFF6FF", borderRadius:9, padding:"10px 14px", marginBottom:10 }}>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", marginBottom:2 }}>Location</div>
+                    <div style={{ fontSize:13, color:"#374151", fontWeight:600, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{mapsAddr}</div>
+                  </div>
+                  {mapsUrl && <a href={mapsUrl} target="_blank" rel="noreferrer"
+                    style={{ display:"inline-flex", alignItems:"center", gap:5, fontSize:13, color:"#2563EB", fontWeight:700, textDecoration:"none", background:"#fff", border:"1px solid #93C5FD", borderRadius:7, padding:"7px 13px", whiteSpace:"nowrap", flexShrink:0, marginLeft:12 }}>
+                    📍 Directions
+                  </a>}
+                </div>
+              )}
+              {show.needToKnow && (
+                <div style={{ background:"#FFFBEB", border:"1px solid #FCD34D", borderLeft:"4px solid #F59E0B", borderRadius:9, padding:"11px 14px", marginBottom:10 }}>
+                  <div style={{ fontSize:13, fontWeight:700, color:"#B45309", textTransform:"uppercase", marginBottom:5 }}>📌 Need to Know</div>
+                  <p style={{ margin:0, fontSize:14, color:"#1F2937", lineHeight:1.55, whiteSpace:"pre-wrap" }}>{show.needToKnow}</p>
+                </div>
+              )}
+              {teammates.length > 0 && (
+                <div style={{ display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginBottom:12 }}>
+                  <span style={{ fontSize:12, color:"#9CA3AF", fontWeight:600 }}>Team:</span>
+                  {teammates.map(t => <span key={t.id} style={{ fontSize:12, background:"#F3F4F6", color:"#374151", borderRadius:10, padding:"3px 10px", fontWeight:600 }}>{t.firstName} {t.lastName}</span>)}
+                </div>
+              )}
+              <div style={{ display:"flex", gap:10, marginBottom:10 }}>
+                <div style={{ background:"#EFF6FF", borderRadius:8, padding:"6px 12px", fontSize:13, fontWeight:700, color:"#1E40AF" }}>
+                  {show.leadCount||0} Leads
+                </div>
+                <div style={{ background:"#ECFDF5", borderRadius:8, padding:"6px 12px", fontSize:13, fontWeight:700, color:"#059669" }}>
+                  {show.appointmentCount||0} Appts
+                </div>
+              </div>
+              <button onClick={() => setLeadShow(show)}
+                style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background:"#16A34A", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:7 }}>
+                ➕ Add Lead
+              </button>
+            </div>
+          );
+        })}
+      </>)}
+
+      {/* ── Upcoming Shows ── */}
+      <h2 style={{ fontSize:19, fontFamily:"'Playfair Display',serif", color:"#1B3A5C", margin:"24px 0 14px", display:"flex", alignItems:"center", gap:8 }}>
         📅 Upcoming Shows
         <span style={{ fontSize:13, fontWeight:700, background:"#EFF6FF", color:"#1E40AF", borderRadius:10, padding:"2px 9px" }}>{upcoming.length}</span>
       </h2>
@@ -2832,20 +2904,9 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
                     {teammates.map(t => <span key={t.id} style={{ fontSize:12, background:"#F3F4F6", color:"#374151", borderRadius:10, padding:"3px 10px", fontWeight:600 }}>{t.firstName} {t.lastName}</span>)}
                   </div>
                 )}
-                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:8 }}>
-                  <div style={{ display:"flex", gap:10 }}>
-                    <div style={{ background:"#EFF6FF", borderRadius:8, padding:"6px 12px", fontSize:13, fontWeight:700, color:"#1E40AF" }}>
-                      {(show.leadCount||0) + (leadCounts[show.id]||0)} Leads
-                    </div>
-                    <div style={{ background:"#ECFDF5", borderRadius:8, padding:"6px 12px", fontSize:13, fontWeight:700, color:"#059669" }}>
-                      {show.appointmentCount||0} Appts
-                    </div>
-                  </div>
+                <div style={{ background:"#F9FAFB", borderRadius:10, padding:"12px 14px", textAlign:"center", border:"1px dashed #D1D5DB", color:"#9CA3AF", fontSize:13, fontWeight:600 }}>
+                  🔒 Lead capture opens when the show is started
                 </div>
-                <button onClick={() => setLeadShow(show)}
-                  style={{ width:"100%", padding:"11px", borderRadius:10, border:"2px solid #C4944A", background:"#FFFBF5", color:"#C4944A", fontSize:14, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:7 }}>
-                  ➕ Add Lead
-                </button>
               </div>
             );
           })
