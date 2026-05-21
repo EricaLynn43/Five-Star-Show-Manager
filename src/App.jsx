@@ -2881,7 +2881,17 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
       }
       {surveyShow && <PostShowSurvey show={surveyShow} employee={emp} onSubmit={s=>{onUpdateShow(s);setSurveyShow(null);}} onClose={()=>setSurveyShow(null)} />}
       {leadShow   && <LeadFormModal show={leadShow} emp={emp} onClose={() => setLeadShow(null)}
-                      onLeadAdded={() => setLeadCounts(p => ({ ...p, [leadShow.id]: (p[leadShow.id]||0) + 1 }))} />}
+                      onLeadAdded={() => {
+                        console.log("onLeadAdded fired. leadShow.id:", leadShow.id, typeof leadShow.id, "shows ids:", shows.map(s=>s.id+"/"+typeof s.id));
+                        const current = shows.find(s => String(s.id) === String(leadShow.id));
+                        console.log("current found:", current ? "YES id="+current.id : "NO — ID mismatch!");
+                        if (current) {
+                          console.log("Calling onUpdateShow with leadCount:", (current.leadCount||0)+1);
+                          onUpdateShow({ ...current, leadCount: (current.leadCount||0) + 1 });
+                        } else {
+                          setLeadCounts(p => ({ ...p, [leadShow.id]: (p[leadShow.id]||0) + 1 }));
+                        }
+                      }} />}
     </div>
   );
 }
@@ -2918,6 +2928,7 @@ export default function App() {
   const [showPasswordRecovery, setShowPasswordRecovery] = useState(false);
   // Owner preview mode
   const [previewEmployeeId,    setPreviewEmployeeId]    = useState(null);
+  const [ownerUserId,          setOwnerUserId]          = useState(null);
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -2977,6 +2988,7 @@ export default function App() {
           empRecordId = Number(linkData.employee_record_id);
           setIsEmployee(true);
           setEmployeeRecordId(empRecordId);
+          setOwnerUserId(empOwnerId);
         }
       } catch(e) {}
 
@@ -3126,7 +3138,15 @@ export default function App() {
           <EmployeePortalView
             employees={employees}
             shows={shows}
-            onUpdateShow={show => setShows(prev => prev.map(s => s.id===show.id ? show : s))}
+            onUpdateShow={async show => {
+              const updated = shows.map(s => s.id===show.id ? show : s);
+              setShows(prev => prev.map(s => s.id===show.id ? show : s));
+              const { error } = await supabase.from("user_data").upsert(
+                { owner_id:user.id, shows:updated, employees, location_name:locationName, notif_timing:notifTiming },
+                { onConflict:"owner_id" }
+              );
+              if (error) console.error("Preview save error:", error);
+            }}
             notifTiming={notifTiming}
             lockedEmployeeId={previewEmployeeId}
           />
@@ -3162,7 +3182,18 @@ export default function App() {
           <EmployeePortalView
             employees={employees}
             shows={shows}
-            onUpdateShow={show => setShows(prev => prev.map(s => s.id===show.id ? show : s))}
+            onUpdateShow={async show => {
+              const updated = shows.map(s => s.id===show.id ? show : s);
+              setShows(prev => prev.map(s => s.id===show.id ? show : s));
+              const ownId = ownerUserId || user?.id;
+              if (ownId) {
+                const { error } = await supabase.from("user_data").upsert(
+                  { owner_id:ownId, shows:updated, employees, location_name:locationName, notif_timing:notifTiming },
+                  { onConflict:"owner_id" }
+                );
+                if (error) console.error("Employee save error:", error);
+              }
+            }}
             notifTiming={notifTiming}
             lockedEmployeeId={employeeRecordId}
             userEmail={user?.email}
@@ -3269,7 +3300,17 @@ export default function App() {
               );
             }}
             onPreviewPortal={id => setPreviewEmployeeId(id)} />}
-          {view==="portal"    && <EmployeePortalView employees={employees} shows={shows} onUpdateShow={updateShow} notifTiming={notifTiming} />}
+          {view==="portal"    && <EmployeePortalView employees={employees} shows={shows} onUpdateShow={async show => {
+              console.log("Portal onUpdateShow called. show.id:", show.id, "leadCount:", show.leadCount);
+              const updated = shows.map(s => s.id===show.id ? show : s);
+              console.log("updated shows leadCounts:", updated.map(s=>({id:s.id,leadCount:s.leadCount})));
+              setShows(prev => prev.map(s => s.id===show.id ? show : s));
+              const { data, error } = await supabase.from("user_data").upsert(
+                { owner_id:user.id, shows:updated, employees, location_name:locationName, notif_timing:notifTiming },
+                { onConflict:"owner_id" }
+              );
+              console.log("Supabase upsert result — data:", data, "error:", error);
+            }} notifTiming={notifTiming} userEmail={user?.email} />}
         </div>
       </div>
 
