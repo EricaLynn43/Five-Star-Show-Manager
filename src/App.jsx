@@ -3290,10 +3290,11 @@ export default function App() {
               setShows(prev => prev.map(s => s.id===show.id ? show : s));
               const ownId = ownerUserId || user?.id;
               if (ownId) {
-                const { error } = await supabase.from("user_data").upsert(
-                  { owner_id:ownId, shows:updated, employees, location_name:locationName, notif_timing:notifTiming },
-                  { onConflict:"owner_id" }
-                );
+                // Use UPDATE (not upsert) — the owner's row always exists,
+                // and the employee INSERT policy blocks upsert even when UPDATE is allowed
+                const { error } = await supabase.from("user_data")
+                  .update({ shows:updated, employees, location_name:locationName, notif_timing:notifTiming })
+                  .eq("owner_id", ownId);
                 if (error) console.error("Employee save error:", error);
               }
             }}
