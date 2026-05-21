@@ -2842,9 +2842,12 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
                   {teammates.map(t => <span key={t.id} style={{ fontSize:12, background:"#F3F4F6", color:"#374151", borderRadius:10, padding:"3px 10px", fontWeight:600 }}>{t.firstName} {t.lastName}</span>)}
                 </div>
               )}
-              <div style={{ display:"flex", gap:10, marginBottom:10 }}>
+              <div style={{ display:"flex", gap:8, marginBottom:10, flexWrap:"wrap" }}>
                 <div style={{ background:"#EFF6FF", borderRadius:8, padding:"6px 12px", fontSize:13, fontWeight:700, color:"#1E40AF" }}>
-                  {show.leadCount||0} Leads
+                  👤 {(show.leadCounts||{})[String(emp.id)]||0} My Leads
+                </div>
+                <div style={{ background:"#DBEAFE", borderRadius:8, padding:"6px 12px", fontSize:13, fontWeight:600, color:"#3B82F6" }}>
+                  📊 {show.leadCount||0} Total
                 </div>
                 <div style={{ background:"#ECFDF5", borderRadius:8, padding:"6px 12px", fontSize:13, fontWeight:700, color:"#059669" }}>
                   {show.appointmentCount||0} Appts
@@ -2961,7 +2964,13 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
                       onLeadAdded={() => {
                         const current = shows.find(s => String(s.id) === String(leadShow.id));
                         if (current) {
-                          onUpdateShow({ ...current, leadCount: (current.leadCount||0) + 1 });
+                          const empKey = String(emp.id);
+                          const prevCounts = current.leadCounts || {};
+                          onUpdateShow({
+                            ...current,
+                            leadCount: (current.leadCount||0) + 1,
+                            leadCounts: { ...prevCounts, [empKey]: (prevCounts[empKey]||0) + 1 },
+                          });
                         } else {
                           setLeadCounts(p => ({ ...p, [leadShow.id]: (p[leadShow.id]||0) + 1 }));
                         }
@@ -3209,6 +3218,7 @@ export default function App() {
           @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Nunito:wght@400;500;600;700&display=swap');
           * { box-sizing:border-box; margin:0; padding:0; font-family:'Nunito',sans-serif; }
           input:focus, select:focus { border-color:#1B3A5C !important; }
+          .pac-container { z-index: 99999 !important; }
         `}</style>
         <div style={{ minHeight:"100vh", background:"#F7F2EB" }}>
           <div style={{ background:"#C4944A", color:"#fff", padding:"10px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
@@ -3256,6 +3266,7 @@ export default function App() {
           @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Nunito:wght@400;500;600;700&display=swap');
           * { box-sizing:border-box; margin:0; padding:0; font-family:'Nunito',sans-serif; }
           input:focus, select:focus { border-color:#1B3A5C !important; }
+          .pac-container { z-index: 99999 !important; }
         `}</style>
         <div style={{ minHeight:"100vh", background:"#F7F2EB" }}>
           <div style={{ background:"#1B3A5C", color:"#fff", padding:"14px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:"0 2px 12px rgba(0,0,0,0.15)" }}>
