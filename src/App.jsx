@@ -1125,7 +1125,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.55)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background:"#fff", borderRadius:22, width:"100%", maxWidth:900, maxHeight:"92vh", display:"flex", flexDirection:"column", boxShadow:"0 20px 60px rgba(0,0,0,0.3)", overflow:"hidden" }}>
+      <div style={{ background:"#fff", borderRadius:22, width:"100%", maxWidth:900, height:"92vh", display:"flex", flexDirection:"column", boxShadow:"0 20px 60px rgba(0,0,0,0.3)", overflow:"hidden" }}>
 
         {/* ── Header ── */}
         <div style={{ background:"#1B3A5C", padding:"18px 28px", display:"flex", alignItems:"center", gap:14, flexShrink:0 }}>
