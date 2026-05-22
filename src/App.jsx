@@ -2781,13 +2781,61 @@ async function smAddLead({ firstName, lastName, phone, email, address, city, sta
   return data;
 }
 
+async function smSlotSearch({ zip, startDate, endDate }) {
+  const res = await fetch("https://serviceminder.com/api/appointments/slotsearch", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ApiKey:    SM_API_KEY,
+      ServiceId: 206180,
+      Zip:       zip,
+      StartDate: startDate,
+      EndDate:   endDate,
+      Duration:  120,
+    }),
+  });
+  if (!res.ok) throw new Error("Network error " + res.status);
+  return await res.json();
+}
+
+async function smBookAppointment({ contactId, slotId, startDateTime, endDateTime, zip }) {
+  const res = await fetch("https://serviceminder.com/api/appointments/add", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ApiKey:        SM_API_KEY,
+      ContactId:     contactId,
+      ServiceId:     206180,
+      SlotId:        slotId,
+      StartDateTime: startDateTime,
+      EndDateTime:   endDateTime,
+      Zip:           zip,
+      Duration:      120,
+    }),
+  });
+  if (!res.ok) throw new Error("Network error " + res.status);
+  return await res.json();
+}
+
 // ─── Lead Form Modal ───────────────────────────────────────────────────────
-function LeadFormModal({ show, emp, onClose, onLeadAdded }) {
+function LeadFormModal({ show, emp, onClose, onLeadAdded, onApptBooked }) {
   const blank = { firstName:"", lastName:"", phone:"", email:"", address:"", city:"", state:"", zip:"", staffNotes:"" };
-  const [form, setForm] = useState({ ...blank });
-  const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
+  const [form,         setForm]         = useState({ ...blank });
+  const [saving,       setSaving]       = useState(false);
+  const [success,      setSuccess]      = useState(false);
+  const [error,        setError]        = useState("");
+  const [savedName,    setSavedName]    = useState("");
+  const [savedZip,     setSavedZip]     = useState("");
+  const [contactId,    setContactId]    = useState(null);
+  // booking flow
+  const [bookingStep,  setBookingStep]  = useState(null); // null|"date"|"slots"|"confirm"|"booked"
+  const [bookingDate,  setBookingDate]  = useState("");
+  const [slotLoading,  setSlotLoading]  = useState(false);
+  const [slots,        setSlots]        = useState([]);
+  const [slotsError,   setSlotsError]   = useState("");
+  const [pickedSlot,   setPickedSlot]   = useState(null);
+  const [booking,      setBooking]      = useState(false);
+  const [bookingError, setBookingError] = useState("");
 
   const empName = emp ? `${emp.firstName} ${emp.lastName}` : "Unknown";
   const note = `Lead captured at ${show.name}${show.date ? " — " + fmtDate(show.date) : ""} by ${empName}`;
@@ -2805,6 +2853,14 @@ function LeadFormModal({ show, emp, onClose, onLeadAdded }) {
     try {
       const result = await smAddLead({ ...form, note, staffNotes: form.staffNotes });
       if (result.ResultCode === 0) {
+        // Save details needed for booking before clearing the form
+        setSavedName(`${form.firstName} ${form.lastName}`.trim());
+        setSavedZip(form.zip);
+        setContactId(result.ContactId || result.Matches?.[0]?.ContactId || null);
+        // Default booking date to tomorrow
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        setBookingDate(tomorrow.toISOString().split("T")[0]);
         setSuccess(true);
         setForm({ ...blank });
         if (onLeadAdded) onLeadAdded();
@@ -2816,6 +2872,46 @@ function LeadFormModal({ show, emp, onClose, onLeadAdded }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  async function searchSlots() {
+    if (!bookingDate) { setSlotsError("Please pick a date."); return; }
+    setSlotsError(""); setSlotLoading(true); setSlots([]);
+    try {
+      const end = new Date(new Date(bookingDate).getTime() + 7 * 86400000).toISOString().split("T")[0];
+      const data = await smSlotSearch({ zip: savedZip, startDate: bookingDate, endDate: end });
+      if (data.ResultCode !== 0) { setSlotsError(data.Message || "No slots returned."); return; }
+      const list = data.Slots || data.AvailableSlots || [];
+      if (list.length === 0) { setSlotsError("No available slots in that window. Try a different date."); return; }
+      setSlots(list);
+      setBookingStep("slots");
+    } catch(err) {
+      setSlotsError("Could not fetch slots — check your connection.");
+    } finally {
+      setSlotLoading(false);
+    }
+  }
+
+  async function confirmBooking() {
+    if (!pickedSlot) return;
+    setBooking(true); setBookingError("");
+    try {
+      const data = await smBookAppointment({
+        contactId,
+        slotId:        pickedSlot.Id || pickedSlot.SlotId,
+        startDateTime: pickedSlot.StartDateTime || pickedSlot.Start,
+        endDateTime:   pickedSlot.EndDateTime   || pickedSlot.End,
+        zip:           savedZip,
+      });
+      if (data.ResultCode !== 0) { setBookingError(data.Message || "Booking failed."); return; }
+      setBookingStep("booked");
+      if (onApptBooked) onApptBooked();
+    } catch(err) {
+      setBookingError("Could not complete booking — please try again.");
+    } finally {
+      setBooking(false);
+    }
+  }
   }
 
   const inputStyle = { width:"100%", padding:"11px 13px", borderRadius:9, border:"2px solid #EDE6DC", fontSize:15, outline:"none", boxSizing:"border-box", color:"#1F2937", background:"#fff" };
@@ -2835,25 +2931,136 @@ function LeadFormModal({ show, emp, onClose, onLeadAdded }) {
 
         <div style={{ padding:"24px" }}>
           {success ? (
-            <div style={{ textAlign:"center", padding:"20px 0" }}>
-              <div style={{ fontSize:52, marginBottom:12 }}>🎉</div>
-              <h3 style={{ fontFamily:"'Playfair Display',serif", color:"#1B3A5C", fontSize:22, margin:"0 0 8px" }}>Lead Added!</h3>
-              <p style={{ color:"#6B7280", fontSize:15, marginBottom:24 }}>Contact has been added to Serviceminder.</p>
-              <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-                <button style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background:"#059669", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>
-                  📅 Book Appointment
-                </button>
-                <div style={{ display:"flex", gap:10 }}>
-                  <button onClick={() => setSuccess(false)}
-                    style={{ flex:1, padding:"13px", borderRadius:10, border:"2px solid #1B3A5C", background:"#fff", color:"#1B3A5C", fontSize:15, fontWeight:700, cursor:"pointer" }}>
-                    + Add Another
-                  </button>
-                  <button onClick={onClose}
-                    style={{ flex:1, padding:"13px", borderRadius:10, border:"none", background:"#1B3A5C", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>
-                    Done
+            <div>
+              {/* ── Step: booked ── */}
+              {bookingStep === "booked" && (
+                <div style={{ textAlign:"center", padding:"20px 0" }}>
+                  <div style={{ fontSize:52, marginBottom:12 }}>✅</div>
+                  <h3 style={{ fontFamily:"'Playfair Display',serif", color:"#059669", fontSize:22, margin:"0 0 8px" }}>Appointment Booked!</h3>
+                  <p style={{ color:"#6B7280", fontSize:15, marginBottom:6 }}>{savedName}</p>
+                  {pickedSlot && (() => {
+                    const d = new Date(pickedSlot.StartDateTime || pickedSlot.Start);
+                    const d2 = new Date(pickedSlot.EndDateTime || pickedSlot.End);
+                    return <p style={{ color:"#1B3A5C", fontWeight:700, fontSize:15, marginBottom:24 }}>
+                      {d.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})} · {d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} – {d2.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}
+                    </p>;
+                  })()}
+                  <div style={{ display:"flex", gap:10 }}>
+                    <button onClick={() => { setSuccess(false); setBookingStep(null); }}
+                      style={{ flex:1, padding:"13px", borderRadius:10, border:"2px solid #1B3A5C", background:"#fff", color:"#1B3A5C", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+                      + Add Another
+                    </button>
+                    <button onClick={onClose}
+                      style={{ flex:1, padding:"13px", borderRadius:10, border:"none", background:"#1B3A5C", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+                      Done
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Step: confirm slot ── */}
+              {bookingStep === "confirm" && pickedSlot && (() => {
+                const d = new Date(pickedSlot.StartDateTime || pickedSlot.Start);
+                const d2 = new Date(pickedSlot.EndDateTime || pickedSlot.End);
+                const tech = pickedSlot.TechName || pickedSlot.StaffName || pickedSlot.AssigneeName || "";
+                return (
+                  <div>
+                    <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:18 }}>
+                      <button onClick={() => setBookingStep("slots")} style={{ background:"none", border:"none", color:"#6B7280", fontSize:20, cursor:"pointer", padding:0, lineHeight:1 }}>←</button>
+                      <h3 style={{ fontFamily:"'Playfair Display',serif", color:"#1B3A5C", fontSize:20, margin:0 }}>Confirm Appointment</h3>
+                    </div>
+                    <div style={{ background:"#F0FDF4", border:"1px solid #6EE7B7", borderRadius:12, padding:"16px 18px", marginBottom:20 }}>
+                      <div style={{ fontWeight:800, fontSize:18, color:"#065F46", marginBottom:4 }}>
+                        {d.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}
+                      </div>
+                      <div style={{ fontSize:15, color:"#1F2937", fontWeight:600 }}>
+                        {d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} – {d2.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}
+                      </div>
+                      {tech && <div style={{ fontSize:13, color:"#6B7280", marginTop:4 }}>👤 {tech}</div>}
+                    </div>
+                    <div style={{ background:"#F7F2EB", borderRadius:10, padding:"12px 14px", marginBottom:20, fontSize:14, color:"#6B7280" }}>
+                      <strong style={{ color:"#1F2937" }}>{savedName}</strong> · Zip: {savedZip}
+                    </div>
+                    {bookingError && <div style={{ background:"#FEF2F2", color:"#DC2626", borderRadius:9, padding:"10px 13px", marginBottom:14, fontSize:13, fontWeight:600 }}>{bookingError}</div>}
+                    <button onClick={confirmBooking} disabled={booking}
+                      style={{ width:"100%", padding:"14px", borderRadius:11, border:"none", background: booking ? "#9CA3AF" : "#059669", color:"#fff", fontSize:16, fontWeight:700, cursor: booking ? "wait" : "pointer" }}>
+                      {booking ? "Booking…" : "✅ Confirm Booking"}
+                    </button>
+                  </div>
+                );
+              })()}
+
+              {/* ── Step: slot list ── */}
+              {bookingStep === "slots" && (
+                <div>
+                  <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:16 }}>
+                    <button onClick={() => setBookingStep("date")} style={{ background:"none", border:"none", color:"#6B7280", fontSize:20, cursor:"pointer", padding:0, lineHeight:1 }}>←</button>
+                    <h3 style={{ fontFamily:"'Playfair Display',serif", color:"#1B3A5C", fontSize:20, margin:0 }}>Available Times</h3>
+                  </div>
+                  <div style={{ maxHeight:320, overflowY:"auto", display:"flex", flexDirection:"column", gap:8 }}>
+                    {slots.map((slot, i) => {
+                      const d = new Date(slot.StartDateTime || slot.Start);
+                      const d2 = new Date(slot.EndDateTime || slot.End);
+                      const tech = slot.TechName || slot.StaffName || slot.AssigneeName || "";
+                      const picked = pickedSlot === slot;
+                      return (
+                        <button key={i} onClick={() => { setPickedSlot(slot); setBookingStep("confirm"); }}
+                          style={{ textAlign:"left", padding:"12px 14px", borderRadius:10, border:"2px solid " + (picked ? "#059669" : "#EDE6DC"),
+                            background: picked ? "#ECFDF5" : "#fff", cursor:"pointer" }}>
+                          <div style={{ fontWeight:700, fontSize:14, color:"#1B3A5C" }}>
+                            {d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}
+                          </div>
+                          <div style={{ fontSize:13, color:"#374151", marginTop:2 }}>
+                            {d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} – {d2.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}
+                          </div>
+                          {tech && <div style={{ fontSize:12, color:"#6B7280", marginTop:2 }}>👤 {tech}</div>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Step: date picker ── */}
+              {bookingStep === "date" && (
+                <div>
+                  <h3 style={{ fontFamily:"'Playfair Display',serif", color:"#1B3A5C", fontSize:20, margin:"0 0 6px" }}>📅 Book Appointment</h3>
+                  <p style={{ color:"#6B7280", fontSize:14, margin:"0 0 18px" }}>Pick a start date — we'll search the next 7 days for availability.</p>
+                  <label style={{ fontSize:13, fontWeight:700, color:"#374151", display:"block", marginBottom:6 }}>Start Date</label>
+                  <input type="date" value={bookingDate} onChange={e => setBookingDate(e.target.value)}
+                    style={{ width:"100%", padding:"11px 13px", borderRadius:9, border:"2px solid #EDE6DC", fontSize:15, color:"#1F2937", outline:"none", boxSizing:"border-box", marginBottom:16, fontFamily:"'Nunito',sans-serif" }} />
+                  {slotsError && <div style={{ background:"#FEF2F2", color:"#DC2626", borderRadius:9, padding:"10px 13px", marginBottom:14, fontSize:13, fontWeight:600 }}>{slotsError}</div>}
+                  <button onClick={searchSlots} disabled={slotLoading}
+                    style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background: slotLoading ? "#9CA3AF" : "#1B3A5C", color:"#fff", fontSize:15, fontWeight:700, cursor: slotLoading ? "wait" : "pointer" }}>
+                    {slotLoading ? "Searching…" : "Search Availability →"}
                   </button>
                 </div>
-              </div>
+              )}
+
+              {/* ── Step: initial success (no booking step yet) ── */}
+              {bookingStep === null && (
+                <div style={{ textAlign:"center", padding:"20px 0" }}>
+                  <div style={{ fontSize:52, marginBottom:12 }}>🎉</div>
+                  <h3 style={{ fontFamily:"'Playfair Display',serif", color:"#1B3A5C", fontSize:22, margin:"0 0 8px" }}>Lead Added!</h3>
+                  <p style={{ color:"#6B7280", fontSize:15, marginBottom:24 }}>Contact has been added to Serviceminder.</p>
+                  <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
+                    <button onClick={() => setBookingStep("date")}
+                      style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background:"#059669", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+                      📅 Book Appointment
+                    </button>
+                    <div style={{ display:"flex", gap:10 }}>
+                      <button onClick={() => { setSuccess(false); setBookingStep(null); }}
+                        style={{ flex:1, padding:"13px", borderRadius:10, border:"2px solid #1B3A5C", background:"#fff", color:"#1B3A5C", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+                        + Add Another
+                      </button>
+                      <button onClick={onClose}
+                        style={{ flex:1, padding:"13px", borderRadius:10, border:"none", background:"#1B3A5C", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <form onSubmit={handleSubmit}>
@@ -3197,6 +3404,12 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
                           });
                         } else {
                           setLeadCounts(p => ({ ...p, [leadShow.id]: (p[leadShow.id]||0) + 1 }));
+                        }
+                      }}
+                      onApptBooked={() => {
+                        const current = shows.find(s => String(s.id) === String(leadShow.id));
+                        if (current) {
+                          onUpdateShow({ ...current, appointmentCount: (current.appointmentCount||0) + 1 });
                         }
                       }} />}
     </div>
