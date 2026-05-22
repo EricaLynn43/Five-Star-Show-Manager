@@ -1104,6 +1104,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
   const { confirm, ConfirmDialog } = useConfirm();
   const today = new Date(); today.setHours(0,0,0,0);
 
+  const totalExpenses = EXPENSE_FIELDS.reduce((sum, f) => sum + (+show[f.key]||0), 0);
   const payments   = show.payments || [];
   const totalPaid  = payments.reduce((sum, p) => sum + (+p.amount||0), 0);
   const remaining  = totalExpenses - totalPaid;
@@ -1150,7 +1151,6 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
   const loadInDay = show.loadInDate || show.date;
   const canStart = !show.showActive && !show.closedAt && loadInDay && todayStr >= loadInDay;
   const canClose = show.showActive;
-  const totalExpenses = EXPENSE_FIELDS.reduce((sum, f) => sum + (+show[f.key]||0), 0);
   const checkItems = show.checklist || [];
   const checkDone = checkItems.filter(c => c.checked).length;
   const checkPct = checkItems.length > 0 ? Math.round((checkDone / checkItems.length) * 100) : 0;
