@@ -27,6 +27,11 @@ const EXPENSE_FIELDS = [
   { key:"hotelCost",     label:"Hotel" },
   { key:"miscParking",   label:"Misc/parking" },
 ];
+const PAYMENT_TYPES = [
+  { value:"deposit", label:"Deposit" },
+  { value:"partial", label:"Partial" },
+  { value:"final",   label:"Final Payment" },
+];
 const US_STATES = [
   "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
   "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
@@ -1088,11 +1093,31 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
   const totalPaidCalc = (+show.depositPaid||0) + (+show.totalPaid||0);
   const balance = (+show.totalDue||0) - totalPaidCalc;
   const comms = show.communications || [];
-  const [addingComm, setAddingComm] = useState(false);
-  const [commType,   setCommType]   = useState("call");
-  const [commNote,   setCommNote]   = useState("");
+  const [addingComm,    setAddingComm]    = useState(false);
+  const [commType,      setCommType]      = useState("call");
+  const [commNote,      setCommNote]      = useState("");
+  const [addingPayment, setAddingPayment] = useState(false);
+  const [payType,       setPayType]       = useState("deposit");
+  const [payAmount,     setPayAmount]     = useState("");
+  const [payDate,       setPayDate]       = useState("");
+  const [payNotes,      setPayNotes]      = useState("");
   const { confirm, ConfirmDialog } = useConfirm();
   const today = new Date(); today.setHours(0,0,0,0);
+
+  const payments   = show.payments || [];
+  const totalPaid  = payments.reduce((sum, p) => sum + (+p.amount||0), 0);
+  const remaining  = totalExpenses - totalPaid;
+
+  function savePayment() {
+    if (!payAmount || +payAmount <= 0) { alert("Please enter a payment amount."); return; }
+    const entry = { id:genId(), amount:+payAmount, date:payDate, type:payType, notes:payNotes.trim() };
+    onUpdateShow({ ...show, payments:[...payments, entry] });
+    setPayAmount(""); setPayDate(""); setPayNotes(""); setPayType("deposit"); setAddingPayment(false);
+  }
+  async function deletePayment(id) {
+    if (!await confirm("Remove this payment?", { danger:true, confirmLabel:"Remove" })) return;
+    onUpdateShow({ ...show, payments:payments.filter(p => p.id !== id) });
+  }
 
   function saveComm() {
     if (!commNote.trim()) { alert("Please add a note about what was covered."); return; }
@@ -1259,6 +1284,97 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
                 rows={2}
                 style={{ width:"100%", padding:"8px 10px", borderRadius:8, border:"1px solid #EDE6DC", fontSize:14, color:"#1F2937", outline:"none", boxSizing:"border-box", resize:"vertical", fontFamily:"'Nunito',sans-serif", lineHeight:1.5 }}
               />
+            </Widget>
+
+            {/* Payments Widget */}
+            <Widget icon="💳" title="Payments"
+              summary={payments.length > 0 ? `${fmtMoney(totalPaid)} paid · ${fmtMoney(Math.max(0,remaining))} remaining` : "No payments logged"}
+              defaultOpen={true}>
+              {/* Summary bar */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:14 }}>
+                <div style={{ background:"#F7F2EB", borderRadius:9, padding:"10px 8px", textAlign:"center" }}>
+                  <div style={{ fontSize:11, color:"#6B7280", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.04em" }}>Total Cost</div>
+                  <div style={{ fontSize:15, fontWeight:800, color:"#1B3A5C", marginTop:3 }}>{fmtMoney(totalExpenses)}</div>
+                </div>
+                <div style={{ background:"#ECFDF5", borderRadius:9, padding:"10px 8px", textAlign:"center" }}>
+                  <div style={{ fontSize:11, color:"#6B7280", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.04em" }}>Paid</div>
+                  <div style={{ fontSize:15, fontWeight:800, color:"#059669", marginTop:3 }}>{fmtMoney(totalPaid)}</div>
+                </div>
+                <div style={{ background: remaining > 0 ? "#FFF1F2" : "#ECFDF5", borderRadius:9, padding:"10px 8px", textAlign:"center" }}>
+                  <div style={{ fontSize:11, color:"#6B7280", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.04em" }}>Remaining</div>
+                  <div style={{ fontSize:15, fontWeight:800, color: remaining > 0 ? "#DC2626" : "#059669", marginTop:3 }}>{fmtMoney(Math.max(0,remaining))}</div>
+                </div>
+              </div>
+              {/* Payment list */}
+              {payments.map(p => (
+                <div key={p.id} style={{ background:"#F7F2EB", border:"1px solid #EDE6DC", borderRadius:9, padding:"10px 12px", marginBottom:7, display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+                  <div>
+                    <div style={{ fontSize:13, fontWeight:700, color:"#1B3A5C" }}>{PAYMENT_TYPES.find(t=>t.value===p.type)?.label || p.type}</div>
+                    <div style={{ fontSize:12, color:"#6B7280", marginTop:2 }}>
+                      {p.date ? fmtDate(p.date) : ""}{p.notes ? (p.date ? " · " : "") + p.notes : ""}
+                    </div>
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                    <span style={{ fontSize:15, fontWeight:800, color:"#059669" }}>{fmtMoney(p.amount)}</span>
+                    <button onClick={() => deletePayment(p.id)}
+                      style={{ background:"none", border:"none", color:"#D1D5DB", fontSize:16, cursor:"pointer", padding:2, lineHeight:1 }}
+                      onMouseEnter={e=>e.currentTarget.style.color="#EF4444"}
+                      onMouseLeave={e=>e.currentTarget.style.color="#D1D5DB"}>×</button>
+                  </div>
+                </div>
+              ))}
+              {/* Add payment */}
+              {!addingPayment
+                ? <button onClick={() => setAddingPayment(true)}
+                    style={{ width:"100%", padding:"9px", borderRadius:9, border:"2px dashed #D1C8BB", background:"transparent", color:"#6B7280", fontSize:14, fontWeight:700, cursor:"pointer", marginTop: payments.length > 0 ? 4 : 0 }}>
+                    + Add Payment
+                  </button>
+                : <div style={{ background:"#F7F2EB", borderRadius:12, border:"2px solid #1B3A5C", padding:16, marginTop:8 }}>
+                    <p style={{ margin:"0 0 12px", fontWeight:700, fontSize:14, color:"#1B3A5C" }}>Log Payment</p>
+                    {/* Type */}
+                    <div style={{ display:"flex", gap:6, marginBottom:12 }}>
+                      {PAYMENT_TYPES.map(t => (
+                        <button key={t.value} onClick={() => setPayType(t.value)} style={{
+                          flex:1, padding:"7px 6px", borderRadius:8, border:"2px solid",
+                          borderColor: payType===t.value ? "#1B3A5C" : "#D1C8BB",
+                          background: payType===t.value ? "#1B3A5C" : "#fff",
+                          color: payType===t.value ? "#fff" : "#6B7280",
+                          fontSize:13, fontWeight:700, cursor:"pointer" }}>
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                    {/* Amount + Date */}
+                    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
+                      <div>
+                        <label style={{ fontSize:12, fontWeight:700, color:"#6B7280", display:"block", marginBottom:4 }}>Amount</label>
+                        <div style={{ display:"flex", alignItems:"center", gap:4, border:"1px solid #EDE6DC", borderRadius:7, padding:"6px 10px", background:"#fff" }}>
+                          <span style={{ color:"#9CA3AF", fontSize:13 }}>$</span>
+                          <input type="number" min="0" step="0.01" value={payAmount} onChange={e=>setPayAmount(e.target.value)}
+                            style={{ flex:1, border:"none", outline:"none", fontSize:14, fontWeight:700, color:"#1F2937", fontFamily:"'Nunito',sans-serif", width:"100%" }}
+                            placeholder="0.00" autoFocus />
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ fontSize:12, fontWeight:700, color:"#6B7280", display:"block", marginBottom:4 }}>Date</label>
+                        <input type="date" value={payDate} onChange={e=>setPayDate(e.target.value)}
+                          style={{ width:"100%", border:"1px solid #EDE6DC", borderRadius:7, padding:"6px 10px", fontSize:14, color:"#1F2937", outline:"none", boxSizing:"border-box", fontFamily:"'Nunito',sans-serif" }} />
+                      </div>
+                    </div>
+                    {/* Notes */}
+                    <div style={{ marginBottom:12 }}>
+                      <label style={{ fontSize:12, fontWeight:700, color:"#6B7280", display:"block", marginBottom:4 }}>Notes (optional)</label>
+                      <input type="text" value={payNotes} onChange={e=>setPayNotes(e.target.value)}
+                        placeholder="e.g. Check #27041"
+                        style={{ width:"100%", border:"1px solid #EDE6DC", borderRadius:7, padding:"6px 10px", fontSize:14, color:"#1F2937", outline:"none", boxSizing:"border-box", fontFamily:"'Nunito',sans-serif" }} />
+                    </div>
+                    <div style={{ display:"flex", gap:8 }}>
+                      <button onClick={savePayment} style={{ background:"#1B3A5C", color:"#fff", border:"none", borderRadius:9, padding:"9px 20px", fontSize:14, fontWeight:700, cursor:"pointer" }}>Save Payment</button>
+                      <button onClick={() => { setAddingPayment(false); setPayAmount(""); setPayDate(""); setPayNotes(""); setPayType("deposit"); }}
+                        style={{ background:"#fff", color:"#6B7280", border:"2px solid #EDE6DC", borderRadius:9, padding:"9px 14px", fontSize:14, cursor:"pointer", fontWeight:600 }}>Cancel</button>
+                    </div>
+                  </div>
+              }
             </Widget>
 
             {/* Staff + Shifts Widget */}
