@@ -18,6 +18,15 @@ const STATUS_ORDER = ["lead","booked","preshow","countdown","complete"];
 const CATEGORIES = ["Home & Garden Show","County Fair","Trade Show","Home Expo","Community Event","Festival","Other"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const EXPENSE_FIELDS = [
+  { key:"boothCost",     label:"Booth Cost" },
+  { key:"laborCost",     label:"Labor" },
+  { key:"loadInCost",    label:"Load in/Out/split" },
+  { key:"rentalCost",    label:"Rental" },
+  { key:"expensesSplit", label:"Expenses/split" },
+  { key:"hotelCost",     label:"Hotel" },
+  { key:"miscParking",   label:"Misc/parking" },
+];
 const US_STATES = [
   "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA",
   "HI","ID","IL","IN","IA","KS","KY","LA","ME","MD",
@@ -1116,6 +1125,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
   const loadInDay = show.loadInDate || show.date;
   const canStart = !show.showActive && !show.closedAt && loadInDay && todayStr >= loadInDay;
   const canClose = show.showActive;
+  const totalExpenses = EXPENSE_FIELDS.reduce((sum, f) => sum + (+show[f.key]||0), 0);
   const checkItems = show.checklist || [];
   const checkDone = checkItems.filter(c => c.checked).length;
   const checkPct = checkItems.length > 0 ? Math.round((checkDone / checkItems.length) * 100) : 0;
@@ -1218,14 +1228,37 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
           <div style={{ overflowY:"auto", padding:"14px 18px" }}>
 
           {/* Financials Widget */}
-            <Widget icon="💰" title="Financials" summary={balance > 0 ? `${fmtMoney(balance)} remaining` : "Paid in full ✓"} defaultOpen={true}>
-              <FinRow label="Total Show Cost" amount={fmtMoney(show.totalDue)} date={show.finalPaymentDueDate} />
-              <FinRow label="Deposit Due"     amount={fmtMoney(show.depositDue)} date={show.depositDueDate} />
-              <FinRow label="Deposit Paid"    amount={fmtMoney(show.depositPaid)} date={show.depositPaidDate} accent="#059669" />
-              <FinRow label="Balance / Final" amount={fmtMoney(show.totalPaid)} date={show.totalPaidDate} accent={(+show.totalPaid||0)>0?"#059669":undefined} />
-              <div style={{ borderTop:"2px dashed #EDE6DC", margin:"6px 0 2px" }} />
-              <FinRow label="Total Paid"  amount={fmtMoney(totalPaidCalc)} accent="#059669" />
-              <FinRow label="Remaining"   amount={fmtMoney(balance)} accent={balance > 0 ? "#DC2626" : "#059669"} />
+            <Widget icon="💰" title="Financials" summary={totalExpenses > 0 ? `${fmtMoney(totalExpenses)} total cost` : "No costs entered yet"} defaultOpen={true}>
+              <p style={{ margin:"0 0 8px", fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Expense Breakdown</p>
+              {EXPENSE_FIELDS.map(f => (
+                <div key={f.key} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 0", borderBottom:"1px solid #F5EDE3" }}>
+                  <span style={{ fontSize:14, color:"#6B7280", fontWeight:500 }}>{f.label}</span>
+                  <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                    <span style={{ fontSize:13, color:"#9CA3AF" }}>$</span>
+                    <input
+                      type="number" min="0" step="0.01"
+                      value={show[f.key] ?? ""}
+                      onChange={e => onUpdateShow({ ...show, [f.key]: e.target.value === "" ? "" : +e.target.value })}
+                      onBlur={e => onUpdateShow({ ...show, [f.key]: +e.target.value || 0 })}
+                      style={{ width:90, textAlign:"right", border:"1px solid #EDE6DC", borderRadius:6, padding:"4px 8px", fontSize:14, fontWeight:700, color:"#1F2937", background:"#fff", outline:"none", fontFamily:"'Nunito',sans-serif" }}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+              ))}
+              <div style={{ borderTop:"2px dashed #EDE6DC", margin:"8px 0 4px" }} />
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 0" }}>
+                <span style={{ fontSize:14, fontWeight:800, color:"#1B3A5C" }}>Total Cost</span>
+                <span style={{ fontSize:16, fontWeight:800, color:"#1B3A5C" }}>{fmtMoney(totalExpenses)}</span>
+              </div>
+              <p style={{ margin:"14px 0 6px", fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Payment Status</p>
+              <textarea
+                value={show.paymentNotes || ""}
+                onChange={e => onUpdateShow({ ...show, paymentNotes: e.target.value })}
+                placeholder="e.g. Paid in full · Check #27041 · 12/10"
+                rows={2}
+                style={{ width:"100%", padding:"8px 10px", borderRadius:8, border:"1px solid #EDE6DC", fontSize:14, color:"#1F2937", outline:"none", boxSizing:"border-box", resize:"vertical", fontFamily:"'Nunito',sans-serif", lineHeight:1.5 }}
+              />
             </Widget>
 
             {/* Staff + Shifts Widget */}
