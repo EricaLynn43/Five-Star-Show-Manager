@@ -2743,7 +2743,8 @@ function PostShowSurvey({ show, employee, onSubmit, onClose }) {
 }
 
 // ─── Serviceminder API ─────────────────────────────────────────────────────
-const SM_API_KEY = "d23d99de62b94383b87f8ccef20543cb"; // sandbox test key
+const SM_API_KEY    = "d23d99de62b94383b87f8ccef20543cb"; // sandbox test key
+const SM_SERVICE_ID = null; // set to your ServiceId once confirmed (e.g. 206180)
 
 async function smAddLead({ firstName, lastName, phone, email, address, city, state, zip, note, staffNotes }) {
   const fullName = `${firstName} ${lastName}`.trim();
@@ -2781,37 +2782,41 @@ async function smAddLead({ firstName, lastName, phone, email, address, city, sta
   return data;
 }
 
-async function smSlotSearch({ zip, startDate, endDate }) {
+async function smSlotSearch({ contactId, zip, startDate, endDate }) {
+  const body = {
+    ApiKey:    SM_API_KEY,
+    ContactId: contactId,
+    Zip:       zip,
+    StartDate: startDate,
+    EndDate:   endDate,
+    Duration:  120,
+  };
+  // Only include ServiceId if we have one configured
+  if (SM_SERVICE_ID) body.ServiceId = SM_SERVICE_ID;
   const res = await fetch("https://serviceminder.com/api/appointments/slotsearch", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ApiKey:    SM_API_KEY,
-      ServiceId: 206180,
-      Zip:       zip,
-      StartDate: startDate,
-      EndDate:   endDate,
-      Duration:  120,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("Network error " + res.status);
   return await res.json();
 }
 
 async function smBookAppointment({ contactId, slotId, startDateTime, endDateTime, zip }) {
+  const body = {
+    ApiKey:        SM_API_KEY,
+    ContactId:     contactId,
+    SlotId:        slotId,
+    StartDateTime: startDateTime,
+    EndDateTime:   endDateTime,
+    Zip:           zip,
+    Duration:      120,
+  };
+  if (SM_SERVICE_ID) body.ServiceId = SM_SERVICE_ID;
   const res = await fetch("https://serviceminder.com/api/appointments/add", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      ApiKey:        SM_API_KEY,
-      ContactId:     contactId,
-      ServiceId:     206180,
-      SlotId:        slotId,
-      StartDateTime: startDateTime,
-      EndDateTime:   endDateTime,
-      Zip:           zip,
-      Duration:      120,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("Network error " + res.status);
   return await res.json();
@@ -2856,7 +2861,16 @@ function LeadFormModal({ show, emp, onClose, onLeadAdded, onApptBooked }) {
         // Save details needed for booking before clearing the form
         setSavedName(`${form.firstName} ${form.lastName}`.trim());
         setSavedZip(form.zip);
-        setContactId(result.ContactId || result.Matches?.[0]?.ContactId || null);
+        // SM addupdate returns ContactId in various shapes depending on version
+        const cid = result.ContactId
+          || result.Id
+          || result.Contact?.Id
+          || result.Contact?.ContactId
+          || result.Matches?.[0]?.ContactId
+          || result.Matches?.[0]?.Id
+          || null;
+        console.log("[SM addupdate result]", result, "→ contactId:", cid);
+        setContactId(cid);
         // Default booking date to tomorrow
         const tomorrow = new Date();
         tomorrow.setDate(tomorrow.getDate() + 1);
@@ -2879,14 +2893,16 @@ function LeadFormModal({ show, emp, onClose, onLeadAdded, onApptBooked }) {
     setSlotsError(""); setSlotLoading(true); setSlots([]);
     try {
       const end = new Date(new Date(bookingDate).getTime() + 7 * 86400000).toISOString().split("T")[0];
-      const data = await smSlotSearch({ zip: savedZip, startDate: bookingDate, endDate: end });
-      if (data.ResultCode !== 0) { setSlotsError(data.Message || "No slots returned."); return; }
-      const list = data.Slots || data.AvailableSlots || [];
+      console.log("[searchSlots] contactId:", contactId, "zip:", savedZip, "start:", bookingDate, "end:", end);
+      const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDate, endDate: end });
+      console.log("[slotsearch response]", data);
+      if (data.ResultCode !== 0) { setSlotsError(`API: ${data.Message || JSON.stringify(data)}`); return; }
+      const list = data.Slots || data.AvailableSlots || data.Results || [];
       if (list.length === 0) { setSlotsError("No available slots in that window. Try a different date."); return; }
       setSlots(list);
       setBookingStep("slots");
     } catch(err) {
-      setSlotsError("Could not fetch slots — check your connection.");
+      setSlotsError(`Error: ${err.message}`);
     } finally {
       setSlotLoading(false);
     }
