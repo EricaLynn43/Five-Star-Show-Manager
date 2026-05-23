@@ -2744,7 +2744,7 @@ function PostShowSurvey({ show, employee, onSubmit, onClose }) {
 
 // ─── Serviceminder API ─────────────────────────────────────────────────────
 const SM_API_KEY    = "d23d99de62b94383b87f8ccef20543cb"; // sandbox test key
-const SM_SERVICE_ID = null; // set to your ServiceId once confirmed (e.g. 206180)
+const SM_SERVICE_ID = 206180; // Sales Appointment service
 
 async function smAddLead({ firstName, lastName, phone, email, address, city, state, zip, note, staffNotes }) {
   const fullName = `${firstName} ${lastName}`.trim();
@@ -2894,16 +2894,7 @@ function LeadFormModal({ show, emp, onClose, onLeadAdded, onApptBooked }) {
     try {
       const end = new Date(new Date(bookingDate).getTime() + 7 * 86400000).toISOString().split("T")[0];
       console.log("[searchSlots] contactId:", contactId, "zip:", savedZip, "start:", bookingDate, "end:", end);
-      // Discover available service IDs
-      try {
-        const svcRes = await fetch("https://serviceminder.com/api/services/list", {
-          method:"POST", headers:{"Content-Type":"application/json"},
-          body: JSON.stringify({ ApiKey: SM_API_KEY })
-        });
-        const svcData = await svcRes.json();
-        console.log("[SM services/list]", svcData);
-      } catch(e) { console.log("[SM services/list error]", e.message); }
-      const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDate, endDate: end });
+const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDate, endDate: end });
       console.log("[slotsearch response]", data);
       if (data.ResultCode !== 0) { setSlotsError(`API: ${data.Message || JSON.stringify(data)}`); return; }
       const list = data.Slots || data.AvailableSlots || data.Results || [];
