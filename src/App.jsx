@@ -2894,6 +2894,15 @@ function LeadFormModal({ show, emp, onClose, onLeadAdded, onApptBooked }) {
     try {
       const end = new Date(new Date(bookingDate).getTime() + 7 * 86400000).toISOString().split("T")[0];
       console.log("[searchSlots] contactId:", contactId, "zip:", savedZip, "start:", bookingDate, "end:", end);
+      // Discover available service IDs
+      try {
+        const svcRes = await fetch("https://serviceminder.com/api/services/list", {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body: JSON.stringify({ ApiKey: SM_API_KEY })
+        });
+        const svcData = await svcRes.json();
+        console.log("[SM services/list]", svcData);
+      } catch(e) { console.log("[SM services/list error]", e.message); }
       const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDate, endDate: end });
       console.log("[slotsearch response]", data);
       if (data.ResultCode !== 0) { setSlotsError(`API: ${data.Message || JSON.stringify(data)}`); return; }
