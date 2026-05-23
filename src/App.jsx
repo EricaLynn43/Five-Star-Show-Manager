@@ -2912,7 +2912,6 @@ function LeadFormModal({ show, emp, onClose, onLeadAdded, onApptBooked }) {
       setBooking(false);
     }
   }
-  }
 
   const inputStyle = { width:"100%", padding:"11px 13px", borderRadius:9, border:"2px solid #EDE6DC", fontSize:15, outline:"none", boxSizing:"border-box", color:"#1F2937", background:"#fff" };
   const labelStyle = { display:"block", fontSize:13, fontWeight:700, color:"#374151", marginBottom:5 };
