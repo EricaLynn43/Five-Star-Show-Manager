@@ -2844,9 +2844,18 @@ async function smBookAppointment({ contactId, serviceAgentId, dateTime, duration
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("Network error " + res.status);
-  const data = await res.json();
-  console.log("[smBookAppointment response]", data);
-  return data;
+  const text = await res.text();
+  console.log("[smBookAppointment raw response]", res.status, JSON.stringify(text));
+  if (!text || !text.trim()) return { ResultCode: 0 }; // empty body = success
+  try {
+    const data = JSON.parse(text);
+    console.log("[smBookAppointment response]", data);
+    return data;
+  } catch(e) {
+    // Non-JSON response — if status was OK treat as success
+    console.warn("[smBookAppointment] Non-JSON response:", text.substring(0, 200));
+    return { ResultCode: 0 };
+  }
 }
 
 // ─── Lead Form Modal ───────────────────────────────────────────────────────
