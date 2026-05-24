@@ -2782,20 +2782,29 @@ async function smAddLead({ firstName, lastName, phone, email, address, city, sta
   return data;
 }
 
-// Parse a slot's start or end datetime from whatever field names SM returns
+// Parse SM's "M/D/YYYY H:MM:SS AM/PM" date string to a Date object
+function parseSmDateTime(str) {
+  if (!str) return new Date("");
+  const m = str.match(/(\d+)\/(\d+)\/(\d+)\s+(\d+):(\d+):(\d+)\s+(AM|PM)/i);
+  if (m) {
+    let [,mo,dy,yr,hr,mn,sc,ap] = m;
+    hr = parseInt(hr);
+    if (ap.toUpperCase() === "PM" && hr !== 12) hr += 12;
+    if (ap.toUpperCase() === "AM" && hr === 12) hr = 0;
+    return new Date(parseInt(yr), parseInt(mo)-1, parseInt(dy), hr, parseInt(mn), parseInt(sc));
+  }
+  return new Date(str); // fallback for ISO strings
+}
+
+// Get start or end Date from a slot; end = start + Duration if no end field
 function slotDt(slot, which) {
-  // Try fully-qualified datetime fields first
-  const full = which === "start"
-    ? (slot.StartDateTime || slot.Start || slot.StartTime || slot.ScheduledStart || slot.AppointmentStart)
-    : (slot.EndDateTime   || slot.End   || slot.EndTime   || slot.ScheduledEnd   || slot.AppointmentEnd);
-  if (full) return new Date(full);
-  // Fall back to separate Date + Time fields
-  const dateStr = slot.Date || slot.AppointmentDate || slot.SlotDate || "";
-  const timeStr = which === "start"
-    ? (slot.StartTime || slot.BeginTime || "")
-    : (slot.EndTime   || slot.FinishTime || "");
-  if (dateStr && timeStr) return new Date(`${dateStr}T${timeStr}`);
-  return new Date(""); // Invalid Date — will surface in console
+  const start = parseSmDateTime(slot.DateTime || slot.StartDateTime || slot.Start || "");
+  if (which === "start") return start;
+  // End: try explicit fields first, then add Duration (minutes)
+  const endRaw = slot.EndDateTime || slot.End || slot.EndTime || "";
+  if (endRaw) return parseSmDateTime(endRaw);
+  const dur = parseInt(slot.Duration) || 120;
+  return new Date(start.getTime() + dur * 60000);
 }
 
 async function smSlotSearch({ contactId, zip, startDate, endDate }) {
@@ -2994,7 +3003,10 @@ const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDa
               {bookingStep === "confirm" && pickedSlot && (() => {
                 const d = slotDt(pickedSlot, "start");
                 const d2 = slotDt(pickedSlot, "end");
-                const tech = pickedSlot.TechName || pickedSlot.StaffName || pickedSlot.AssigneeName || "";
+                const tech = pickedSlot.ServiceAgentName || pickedSlot.TechName || pickedSlot.StaffName || "";
+                const dtLabel = pickedSlot.DateTimeFormatted
+                  || d.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"});
+                const timeRange = `${d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} – ${d2.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`;
                 return (
                   <div>
                     <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:18 }}>
@@ -3002,12 +3014,10 @@ const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDa
                       <h3 style={{ fontFamily:"'Playfair Display',serif", color:"#1B3A5C", fontSize:20, margin:0 }}>Confirm Appointment</h3>
                     </div>
                     <div style={{ background:"#F0FDF4", border:"1px solid #6EE7B7", borderRadius:12, padding:"16px 18px", marginBottom:20 }}>
-                      <div style={{ fontWeight:800, fontSize:18, color:"#065F46", marginBottom:4 }}>
-                        {d.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})}
-                      </div>
-                      <div style={{ fontSize:15, color:"#1F2937", fontWeight:600 }}>
-                        {d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} – {d2.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}
-                      </div>
+                      <div style={{ fontWeight:800, fontSize:18, color:"#065F46", marginBottom:4 }}>{dtLabel}</div>
+                      {!pickedSlot.DateTimeFormatted && (
+                        <div style={{ fontSize:15, color:"#1F2937", fontWeight:600 }}>{timeRange}</div>
+                      )}
                       {tech && <div style={{ fontSize:13, color:"#6B7280", marginTop:4 }}>👤 {tech}</div>}
                     </div>
                     <div style={{ background:"#F7F2EB", borderRadius:10, padding:"12px 14px", marginBottom:20, fontSize:14, color:"#6B7280" }}>
@@ -3033,18 +3043,20 @@ const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDa
                     {slots.map((slot, i) => {
                       const d = slotDt(slot, "start");
                       const d2 = slotDt(slot, "end");
-                      const tech = slot.TechName || slot.StaffName || slot.AssigneeName || "";
+                      const tech = slot.ServiceAgentName || slot.TechName || slot.StaffName || "";
                       const picked = pickedSlot === slot;
+                      // Use SM's pre-formatted string when available
+                      const label = slot.DateTimeFormatted
+                        || d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+                      const timeRange = `${d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} – ${d2.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}`;
                       return (
                         <button key={i} onClick={() => { setPickedSlot(slot); setBookingStep("confirm"); }}
                           style={{ textAlign:"left", padding:"12px 14px", borderRadius:10, border:"2px solid " + (picked ? "#059669" : "#EDE6DC"),
                             background: picked ? "#ECFDF5" : "#fff", cursor:"pointer" }}>
-                          <div style={{ fontWeight:700, fontSize:14, color:"#1B3A5C" }}>
-                            {d.toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"})}
-                          </div>
-                          <div style={{ fontSize:13, color:"#374151", marginTop:2 }}>
-                            {d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} – {d2.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}
-                          </div>
+                          <div style={{ fontWeight:700, fontSize:14, color:"#1B3A5C" }}>{label}</div>
+                          {!slot.DateTimeFormatted && (
+                            <div style={{ fontSize:13, color:"#374151", marginTop:2 }}>{timeRange}</div>
+                          )}
                           {tech && <div style={{ fontSize:12, color:"#6B7280", marginTop:2 }}>👤 {tech}</div>}
                         </button>
                       );
