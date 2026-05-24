@@ -2782,6 +2782,22 @@ async function smAddLead({ firstName, lastName, phone, email, address, city, sta
   return data;
 }
 
+// Parse a slot's start or end datetime from whatever field names SM returns
+function slotDt(slot, which) {
+  // Try fully-qualified datetime fields first
+  const full = which === "start"
+    ? (slot.StartDateTime || slot.Start || slot.StartTime || slot.ScheduledStart || slot.AppointmentStart)
+    : (slot.EndDateTime   || slot.End   || slot.EndTime   || slot.ScheduledEnd   || slot.AppointmentEnd);
+  if (full) return new Date(full);
+  // Fall back to separate Date + Time fields
+  const dateStr = slot.Date || slot.AppointmentDate || slot.SlotDate || "";
+  const timeStr = which === "start"
+    ? (slot.StartTime || slot.BeginTime || "")
+    : (slot.EndTime   || slot.FinishTime || "");
+  if (dateStr && timeStr) return new Date(`${dateStr}T${timeStr}`);
+  return new Date(""); // Invalid Date — will surface in console
+}
+
 async function smSlotSearch({ contactId, zip, startDate, endDate }) {
   const body = {
     ApiKey:    SM_API_KEY,
@@ -2899,6 +2915,7 @@ const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDa
       if (data.ResultCode !== 0) { setSlotsError(`API: ${data.Message || JSON.stringify(data)}`); return; }
       const list = data.Slots || data.AvailableSlots || data.Results || [];
       if (list.length === 0) { setSlotsError("No available slots in that window. Try a different date."); return; }
+      if (list[0]) console.log("[first slot keys]", Object.keys(list[0]), list[0]);
       setSlots(list);
       setBookingStep("slots");
     } catch(err) {
@@ -2914,9 +2931,9 @@ const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDa
     try {
       const data = await smBookAppointment({
         contactId,
-        slotId:        pickedSlot.Id || pickedSlot.SlotId,
-        startDateTime: pickedSlot.StartDateTime || pickedSlot.Start,
-        endDateTime:   pickedSlot.EndDateTime   || pickedSlot.End,
+        slotId:        pickedSlot.Id || pickedSlot.SlotId || pickedSlot.SlotID,
+        startDateTime: slotDt(pickedSlot, "start").toISOString(),
+        endDateTime:   slotDt(pickedSlot, "end").toISOString(),
         zip:           savedZip,
       });
       if (data.ResultCode !== 0) { setBookingError(data.Message || "Booking failed."); return; }
@@ -2954,8 +2971,8 @@ const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDa
                   <h3 style={{ fontFamily:"'Playfair Display',serif", color:"#059669", fontSize:22, margin:"0 0 8px" }}>Appointment Booked!</h3>
                   <p style={{ color:"#6B7280", fontSize:15, marginBottom:6 }}>{savedName}</p>
                   {pickedSlot && (() => {
-                    const d = new Date(pickedSlot.StartDateTime || pickedSlot.Start);
-                    const d2 = new Date(pickedSlot.EndDateTime || pickedSlot.End);
+                    const d = slotDt(pickedSlot, "start");
+                    const d2 = slotDt(pickedSlot, "end");
                     return <p style={{ color:"#1B3A5C", fontWeight:700, fontSize:15, marginBottom:24 }}>
                       {d.toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric"})} · {d.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})} – {d2.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"})}
                     </p>;
@@ -2975,8 +2992,8 @@ const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDa
 
               {/* ── Step: confirm slot ── */}
               {bookingStep === "confirm" && pickedSlot && (() => {
-                const d = new Date(pickedSlot.StartDateTime || pickedSlot.Start);
-                const d2 = new Date(pickedSlot.EndDateTime || pickedSlot.End);
+                const d = slotDt(pickedSlot, "start");
+                const d2 = slotDt(pickedSlot, "end");
                 const tech = pickedSlot.TechName || pickedSlot.StaffName || pickedSlot.AssigneeName || "";
                 return (
                   <div>
@@ -3014,8 +3031,8 @@ const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDa
                   </div>
                   <div style={{ maxHeight:320, overflowY:"auto", display:"flex", flexDirection:"column", gap:8 }}>
                     {slots.map((slot, i) => {
-                      const d = new Date(slot.StartDateTime || slot.Start);
-                      const d2 = new Date(slot.EndDateTime || slot.End);
+                      const d = slotDt(slot, "start");
+                      const d2 = slotDt(slot, "end");
                       const tech = slot.TechName || slot.StaffName || slot.AssigneeName || "";
                       const picked = pickedSlot === slot;
                       return (
