@@ -2827,24 +2827,26 @@ async function smSlotSearch({ contactId, zip, startDate, endDate }) {
   return await res.json();
 }
 
-async function smBookAppointment({ contactId, slotId, startDateTime, endDateTime, zip }) {
+async function smBookAppointment({ contactId, serviceAgentId, dateTime, duration, zip }) {
   const body = {
-    ApiKey:        SM_API_KEY,
-    ContactId:     contactId,
-    SlotId:        slotId,
-    StartDateTime: startDateTime,
-    EndDateTime:   endDateTime,
-    Zip:           zip,
-    Duration:      120,
+    ApiKey:         SM_API_KEY,
+    ContactId:      contactId,
+    ServiceAgentId: serviceAgentId,
+    DateTime:       dateTime,   // "M/D/YYYY H:MM:SS AM/PM" — passed back as-is from slot
+    Duration:       duration || 120,
+    Zip:            zip,
   };
   if (SM_SERVICE_ID) body.ServiceId = SM_SERVICE_ID;
+  console.log("[smBookAppointment body]", body);
   const res = await fetch("https://serviceminder.com/api/appointments/add", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("Network error " + res.status);
-  return await res.json();
+  const data = await res.json();
+  console.log("[smBookAppointment response]", data);
+  return data;
 }
 
 // ─── Lead Form Modal ───────────────────────────────────────────────────────
@@ -2940,16 +2942,16 @@ const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDa
     try {
       const data = await smBookAppointment({
         contactId,
-        slotId:        pickedSlot.Id || pickedSlot.SlotId || pickedSlot.SlotID,
-        startDateTime: slotDt(pickedSlot, "start").toISOString(),
-        endDateTime:   slotDt(pickedSlot, "end").toISOString(),
-        zip:           savedZip,
+        serviceAgentId: pickedSlot.ServiceAgentId,
+        dateTime:       pickedSlot.DateTime,   // pass raw SM string back unchanged
+        duration:       pickedSlot.Duration || 120,
+        zip:            savedZip,
       });
-      if (data.ResultCode !== 0) { setBookingError(data.Message || "Booking failed."); return; }
+      if (data.ResultCode !== 0) { setBookingError(`API: ${data.Message || JSON.stringify(data)}`); return; }
       setBookingStep("booked");
       if (onApptBooked) onApptBooked();
     } catch(err) {
-      setBookingError("Could not complete booking — please try again.");
+      setBookingError(`Error: ${err.message}`);
     } finally {
       setBooking(false);
     }
