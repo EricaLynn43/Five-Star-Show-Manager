@@ -40,6 +40,22 @@ const US_STATES = [
   "SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","DC"
 ];
 
+// ─── Brand ─────────────────────────────────────────────────────────────────
+const BRAND_BLUE = "#00AEEF";
+
+function BubbleLogo({ size = 48, color = BRAND_BLUE }) {
+  const s = size;
+  const h = Math.round(s * 1.4);
+  const sw = s * 0.075; // stroke width proportional
+  return (
+    <svg width={s} height={h} viewBox="0 0 100 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="55"  cy="11" r="11.5" stroke={color} strokeWidth={sw * (100/s) * 1} />
+      <circle cx="67"  cy="43" r="24"   stroke={color} strokeWidth={sw * (100/s) * 1} />
+      <circle cx="35"  cy="98" r="40"   stroke={color} strokeWidth={sw * (100/s) * 1} />
+    </svg>
+  );
+}
+
 // ─── Hooks ─────────────────────────────────────────────────────────────────
 function useMobile() {
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 768);
@@ -316,15 +332,15 @@ function BottomNav({ view, setView, onAddShow }) {
           <button key={item.id} onClick={() => setView(item.id)} style={{
             flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
             padding:"8px 4px", border:"none", background:"transparent", cursor:"pointer",
-            borderTop: active ? "3px solid #C4944A" : "3px solid transparent" }}>
+            borderTop: active ? `3px solid ${BRAND_BLUE}` : "3px solid transparent" }}>
             <span style={{ fontSize:20, lineHeight:1, marginBottom:2 }}>{item.icon}</span>
-            <span style={{ fontSize:10, fontWeight: active?700:500, color: active?"#C4944A":"rgba(255,255,255,0.6)", fontFamily:"'Nunito',sans-serif" }}>{item.label}</span>
+            <span style={{ fontSize:10, fontWeight: active?700:500, color: active?BRAND_BLUE:"rgba(255,255,255,0.6)", fontFamily:"'Nunito',sans-serif" }}>{item.label}</span>
           </button>
         );
       })}
       <button onClick={onAddShow} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center",
         padding:"8px 4px", border:"none", background:"transparent", cursor:"pointer", borderTop:"3px solid transparent" }}>
-        <span style={{ fontSize:22, lineHeight:1, marginBottom:2, color:"#C4944A" }}>+</span>
+        <span style={{ fontSize:22, lineHeight:1, marginBottom:2, color:BRAND_BLUE }}>+</span>
         <span style={{ fontSize:10, fontWeight:500, color:"rgba(255,255,255,0.6)", fontFamily:"'Nunito',sans-serif" }}>Add Show</span>
       </button>
     </div>
@@ -361,13 +377,16 @@ function LoginScreen() {
     fontSize:16, outline:"none", boxSizing:"border-box", color:"#1F2937", fontFamily:"'Nunito',sans-serif" };
 
   return (
-    <div style={{ minHeight:"100vh", background:"#F7F2EB", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+    <div style={{ minHeight:"100vh", background:"#F0F8FE", display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
       <style>{"@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Nunito:wght@400;500;600;700&display=swap');"}</style>
-      <div style={{ background:"#fff", borderRadius:24, padding:"44px 40px", width:"100%", maxWidth:440, boxShadow:"0 8px 40px rgba(27,58,92,0.12)" }}>
+      <div style={{ background:"#fff", borderRadius:24, padding:"44px 40px", width:"100%", maxWidth:440, boxShadow:"0 8px 48px rgba(0,174,239,0.13)" }}>
         <div style={{ textAlign:"center", marginBottom:36 }}>
-          <div style={{ fontSize:52, marginBottom:12 }}>⭐</div>
-          <h1 style={{ fontFamily:"'Playfair Display',serif", color:"#1B3A5C", fontSize:30, margin:"0 0 8px" }}>Show Manager</h1>
-          <p style={{ color:"#6B7280", fontSize:16, margin:0 }}>Five Star Bath Solutions</p>
+          <div style={{ display:"flex", justifyContent:"center", marginBottom:14 }}>
+            <BubbleLogo size={64} />
+          </div>
+          <div style={{ fontSize:11, fontWeight:800, color:BRAND_BLUE, textTransform:"uppercase", letterSpacing:"0.18em", marginBottom:6 }}>Five Star Bath Solutions</div>
+          <h1 style={{ fontFamily:"'Playfair Display',serif", color:"#1B3A5C", fontSize:28, margin:"0 0 6px" }}>Show Manager</h1>
+          <p style={{ color:"#9CA3AF", fontSize:14, margin:0 }}>Sign in to manage your shows</p>
         </div>
 
         {magicSent ? (
@@ -398,11 +417,11 @@ function LoginScreen() {
               <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" style={inputStyle} />
             </div>
             <button type="submit" disabled={loading}
-              style={{ width:"100%", padding:"16px", borderRadius:12, border:"none", background:"#1B3A5C", color:"#fff", fontSize:17, fontWeight:700, cursor:loading?"wait":"pointer", marginBottom:14, opacity:loading?0.7:1, fontFamily:"'Nunito',sans-serif" }}>
+              style={{ width:"100%", padding:"16px", borderRadius:12, border:"none", background:BRAND_BLUE, color:"#fff", fontSize:17, fontWeight:700, cursor:loading?"wait":"pointer", marginBottom:14, opacity:loading?0.7:1, fontFamily:"'Nunito',sans-serif" }}>
               {loading ? "Signing In…" : "Sign In"}
             </button>
             <button type="button" onClick={handleMagicLink} disabled={loading}
-              style={{ width:"100%", padding:"14px", borderRadius:12, border:"2px solid #1B3A5C", background:"transparent", color:"#1B3A5C", fontSize:15, fontWeight:700, cursor:loading?"wait":"pointer", opacity:loading?0.7:1, fontFamily:"'Nunito',sans-serif" }}>
+              style={{ width:"100%", padding:"14px", borderRadius:12, border:`2px solid ${BRAND_BLUE}`, background:"transparent", color:BRAND_BLUE, fontSize:15, fontWeight:700, cursor:loading?"wait":"pointer", opacity:loading?0.7:1, fontFamily:"'Nunito',sans-serif" }}>
               Send Magic Link Instead
             </button>
             <button type="button" onClick={async () => {
@@ -629,7 +648,7 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
                   <div>
                     <div style={{ fontWeight:700, fontSize:18, color:"#1F2937" }}>
                       {emp.firstName} {emp.lastName}
-                      {emp.isAdmin && <span style={{ marginLeft:8, fontSize:13, background:"#C4944A", color:"#fff", borderRadius:10, padding:"2px 9px", verticalAlign:"middle" }}>Admin</span>}
+                      {emp.isAdmin && <span style={{ marginLeft:8, fontSize:13, background:BRAND_BLUE, color:"#fff", borderRadius:10, padding:"2px 9px", verticalAlign:"middle" }}>Admin</span>}
                     </div>
                     <div style={{ color:"#6B7280", fontSize:14, marginTop:2 }}>{emp.email}</div>
                     <div style={{ color:"#6B7280", fontSize:14 }}>{emp.phone}</div>
@@ -671,7 +690,7 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
                   </button>
                 </div>
                 <button onClick={() => onPreviewPortal && onPreviewPortal(emp.id)}
-                  style={{ width:"100%", marginBottom:16, padding:"10px", borderRadius:9, border:"2px dashed #C4944A", background:"#FFFBF5", color:"#C4944A", fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
+                  style={{ width:"100%", marginBottom:16, padding:"10px", borderRadius:9, border:`2px dashed ${BRAND_BLUE}`, background:"#F0F8FE", color:BRAND_BLUE, fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}>
                   👁 Preview Portal as {emp.firstName}
                 </button>
                 <div style={{ fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.06em", marginBottom:10 }}>Assigned Shows ({assigned.length})</div>
@@ -2014,7 +2033,7 @@ function ImportModal({ onImport, onClose }) {
         <div style={{ padding:"24px 28px", overflowY:"auto", flex:1 }}>
           {step === "upload" && (
             <div>
-              <div style={{ background:"#F7F2EB", border:"2px dashed #C4944A", borderRadius:16, padding:"40px 24px", textAlign:"center", marginBottom:20, cursor:"pointer" }}
+              <div style={{ background:"#F0F8FE", border:`2px dashed ${BRAND_BLUE}`, borderRadius:16, padding:"40px 24px", textAlign:"center", marginBottom:20, cursor:"pointer" }}
                 onClick={() => fileRef.current && fileRef.current.click()}>
                 <div style={{ fontSize:48, marginBottom:12 }}>📂</div>
                 <p style={{ fontSize:18, fontWeight:700, color:"#1B3A5C", margin:"0 0 8px" }}>Click to choose your file</p>
@@ -2158,15 +2177,15 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder="🔍  Search shows or contacts…"
           style={{ flex:"1 1 240px", padding:"12px 16px", borderRadius:10, border:"2px solid #EDE6DC", fontSize:15, outline:"none", background:"#fff", color:"#1F2937" }} />
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          style={{ padding:"11px 14px", borderRadius:10, border:"2px solid " + (filterStatus !== "all" ? "#C4944A" : "#EDE6DC"),
-            fontSize:14, fontWeight:600, color: filterStatus !== "all" ? "#C4944A" : "#4B5563",
+          style={{ padding:"11px 14px", borderRadius:10, border:"2px solid " + (filterStatus !== "all" ? BRAND_BLUE : "#EDE6DC"),
+            fontSize:14, fontWeight:600, color: filterStatus !== "all" ? BRAND_BLUE : "#4B5563",
             background:"#fff", cursor:"pointer", outline:"none", minWidth:160 }}>
           <option value="all">All Statuses</option>
           {STATUS_ORDER.map(k => <option key={k} value={k}>{STATUSES[k].label}</option>)}
         </select>
         <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
-          style={{ padding:"11px 14px", borderRadius:10, border:"2px solid " + (filterCategory !== "all" ? "#C4944A" : "#EDE6DC"),
-            fontSize:14, fontWeight:600, color: filterCategory !== "all" ? "#C4944A" : "#4B5563",
+          style={{ padding:"11px 14px", borderRadius:10, border:"2px solid " + (filterCategory !== "all" ? BRAND_BLUE : "#EDE6DC"),
+            fontSize:14, fontWeight:600, color: filterCategory !== "all" ? BRAND_BLUE : "#4B5563",
             background:"#fff", cursor:"pointer", outline:"none", minWidth:180 }}>
           <option value="all">All Categories</option>
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
@@ -2208,7 +2227,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
                       <button onClick={() => setShowDateFilter(o => !o)} style={{
                         background:"none", border:"none", cursor:"pointer", padding:0,
                         display:"flex", alignItems:"center", gap:5,
-                        color: dateFilterActive ? "#C4944A" : "#4B5563", fontWeight:700, fontSize:14,
+                        color: dateFilterActive ? BRAND_BLUE : "#4B5563", fontWeight:700, fontSize:14,
                         textTransform:"uppercase", letterSpacing:"0.05em", fontFamily:"'Nunito',sans-serif" }}>
                         Date {dateFilterActive ? "🔽" : "▾"}
                       </button>
@@ -2240,7 +2259,7 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
                             </button>
                           </div>
                           {dateFilterActive && (
-                            <div style={{ marginTop:10, fontSize:12, color:"#C4944A", fontWeight:700, textAlign:"center" }}>
+                            <div style={{ marginTop:10, fontSize:12, color:BRAND_BLUE, fontWeight:700, textAlign:"center" }}>
                               {filterDateFrom ? fmtDate(filterDateFrom) : "Any"} → {filterDateTo ? fmtDate(filterDateTo) : "Any"}
                             </div>
                           )}
@@ -2976,7 +2995,7 @@ const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDa
         {/* Header */}
         <div style={{ background:"#1B3A5C", borderRadius:"20px 20px 0 0", padding:"20px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
           <div>
-            <div style={{ fontSize:12, fontWeight:700, color:"#C4944A", textTransform:"uppercase", letterSpacing:"0.1em" }}>Add Lead</div>
+            <div style={{ fontSize:12, fontWeight:700, color:BRAND_BLUE, textTransform:"uppercase", letterSpacing:"0.1em" }}>Add Lead</div>
             <div style={{ fontSize:17, fontWeight:700, color:"#fff", marginTop:2 }}>{show.name}</div>
           </div>
           <button onClick={onClose} style={{ background:"rgba(255,255,255,0.1)", border:"1px solid rgba(255,255,255,0.25)", borderRadius:8, padding:"7px 13px", color:"#fff", fontSize:18, cursor:"pointer", lineHeight:1 }}>×</button>
@@ -3235,7 +3254,7 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
                     <div style={{ fontWeight:700, fontSize:17, color:"#1F2937" }}>{e.firstName} {e.lastName}</div>
                     <div style={{ fontSize:13, color:"#6B7280", marginTop:2 }}>{e.phone}</div>
                   </div>
-                  <span style={{ fontSize:22, color:"#C4944A" }}>→</span>
+                  <span style={{ fontSize:22, color:BRAND_BLUE }}>→</span>
                 </button>
               ))}
             </div>
@@ -3714,10 +3733,10 @@ export default function App() {
           .pac-container { z-index: 99999 !important; }
         `}</style>
         <div style={{ minHeight:"100vh", background:"#F7F2EB" }}>
-          <div style={{ background:"#C4944A", color:"#fff", padding:"10px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
+          <div style={{ background:BRAND_BLUE, color:"#fff", padding:"10px 24px", display:"flex", alignItems:"center", justifyContent:"space-between" }}>
             <div style={{ fontSize:13, fontWeight:700 }}>👁 Preview Mode — viewing as {empRecord?.firstName} {empRecord?.lastName}</div>
             <button onClick={() => setPreviewEmployeeId(null)}
-              style={{ background:"#fff", color:"#C4944A", border:"none", borderRadius:8, padding:"7px 16px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
+              style={{ background:"#fff", color:BRAND_BLUE, border:"none", borderRadius:8, padding:"7px 16px", fontSize:13, fontWeight:700, cursor:"pointer" }}>
               ✕ Exit Preview
             </button>
           </div>
@@ -3725,7 +3744,7 @@ export default function App() {
             <div style={{ display:"flex", alignItems:"center", gap:12 }}>
               <span style={{ fontSize:24 }}>⭐</span>
               <div>
-                <div style={{ fontSize:12, fontWeight:700, color:"#C4944A", textTransform:"uppercase", letterSpacing:"0.1em" }}>Five Star Show Manager</div>
+                <div style={{ fontSize:12, fontWeight:700, color:BRAND_BLUE, textTransform:"uppercase", letterSpacing:"0.1em" }}>Five Star Show Manager</div>
                 {empRecord && <div style={{ fontSize:17, fontWeight:700 }}>{empRecord.firstName} {empRecord.lastName}</div>}
               </div>
             </div>
@@ -3766,7 +3785,7 @@ export default function App() {
             <div style={{ display:"flex", alignItems:"center", gap:12 }}>
               <span style={{ fontSize:24 }}>⭐</span>
               <div>
-                <div style={{ fontSize:12, fontWeight:700, color:"#C4944A", textTransform:"uppercase", letterSpacing:"0.1em" }}>Five Star Show Manager</div>
+                <div style={{ fontSize:12, fontWeight:700, color:BRAND_BLUE, textTransform:"uppercase", letterSpacing:"0.1em" }}>Five Star Show Manager</div>
                 {empRecord && <div style={{ fontSize:17, fontWeight:700 }}>{empRecord.firstName} {empRecord.lastName}</div>}
               </div>
             </div>
@@ -3818,8 +3837,14 @@ export default function App() {
         {/* ── Sidebar (desktop only) ── */}
         {!isMobile && (
           <div style={{ width:238, background:"#1B3A5C", color:"#fff", display:"flex", flexDirection:"column", flexShrink:0, overflowY:"auto" }}>
-            <div style={{ padding:"26px 22px 18px", borderBottom:"1px solid rgba(255,255,255,0.1)" }}>
-              <div style={{ fontSize:13, fontWeight:700, color:"#C4944A", textTransform:"uppercase", letterSpacing:"0.12em", marginBottom:5 }}>Show Manager</div>
+            <div style={{ padding:"22px 22px 18px", borderBottom:"1px solid rgba(255,255,255,0.1)" }}>
+              <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+                <BubbleLogo size={32} />
+                <div>
+                  <div style={{ fontSize:9, fontWeight:800, color:BRAND_BLUE, textTransform:"uppercase", letterSpacing:"0.14em", lineHeight:1 }}>Five Star Bath</div>
+                  <div style={{ fontSize:11, fontWeight:700, color:"rgba(255,255,255,0.5)", textTransform:"uppercase", letterSpacing:"0.1em", marginTop:2 }}>Show Manager</div>
+                </div>
+              </div>
               {editingName ? (
                 <div>
                   <input autoFocus value={nameInput} onChange={e => setNameInput(e.target.value)}
@@ -3850,10 +3875,10 @@ export default function App() {
                   <button key={item.id} onClick={() => setView(item.id)} style={{
                     width:"100%", display:"flex", alignItems:"center", gap:12, padding:"14px 16px",
                     borderRadius:10, border:"none", marginBottom:3,
-                    background: active ? "rgba(196,148,74,0.18)" : "transparent",
-                    color: active ? "#C4944A" : "rgba(255,255,255,0.72)",
+                    background: active ? "rgba(0,174,239,0.15)" : "transparent",
+                    color: active ? BRAND_BLUE : "rgba(255,255,255,0.72)",
                     fontWeight: active ? 700 : 500, fontSize:16, cursor:"pointer",
-                    borderLeft: active ? "3px solid #C4944A" : "3px solid transparent",
+                    borderLeft: active ? `3px solid ${BRAND_BLUE}` : "3px solid transparent",
                     textAlign:"left", transition:"all 0.15s" }}>
                     <span style={{ fontSize:20 }}>{item.icon}</span>{item.label}
                   </button>
@@ -3869,9 +3894,9 @@ export default function App() {
                 </div>
               )}
               <button onClick={openAdd}
-                style={{ width:"100%", padding:"15px", borderRadius:12, border:"2px solid #C4944A", background:"transparent", color:"#C4944A", fontSize:15, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, transition:"all 0.15s" }}
-                onMouseEnter={e => { e.currentTarget.style.background="#C4944A"; e.currentTarget.style.color="#fff"; }}
-                onMouseLeave={e => { e.currentTarget.style.background="transparent"; e.currentTarget.style.color="#C4944A"; }}>
+                style={{ width:"100%", padding:"15px", borderRadius:12, border:`2px solid ${BRAND_BLUE}`, background:"transparent", color:BRAND_BLUE, fontSize:15, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8, transition:"all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background=BRAND_BLUE; e.currentTarget.style.color="#fff"; }}
+                onMouseLeave={e => { e.currentTarget.style.background="transparent"; e.currentTarget.style.color=BRAND_BLUE; }}>
                 <span style={{ fontSize:22, lineHeight:1 }}>+</span> New Show
               </button>
               <button onClick={() => supabase.auth.signOut()}
@@ -3997,7 +4022,7 @@ function DashboardView({ shows, setView, onAddShow, onViewShow, isMobile, userEm
         <div style={{ background:"#fff", borderRadius:18, border:"1px solid #EDE6DC", overflow:"hidden" }}>
           <div style={{ padding:"18px 24px", borderBottom:"1px solid #F5EDE3", display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <h2 style={{ margin:0, fontSize:20, color:"#1B3A5C", fontFamily:"'Playfair Display',serif" }}>Upcoming Shows</h2>
-            <button onClick={() => setView("shows")} style={{ background:"none", border:"none", color:"#C4944A", fontWeight:700, fontSize:14, cursor:"pointer" }}>View All →</button>
+            <button onClick={() => setView("shows")} style={{ background:"none", border:"none", color:BRAND_BLUE, fontWeight:700, fontSize:14, cursor:"pointer" }}>View All →</button>
           </div>
           {upcoming.length === 0
             ? <div style={{ padding:40, textAlign:"center", color:"#9CA3AF", fontSize:16 }}>No upcoming shows yet. Add one!</div>
