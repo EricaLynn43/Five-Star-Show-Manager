@@ -2743,8 +2743,9 @@ function PostShowSurvey({ show, employee, onSubmit, onClose }) {
 }
 
 // ─── Serviceminder API ─────────────────────────────────────────────────────
-const SM_API_KEY    = "d23d99de62b94383b87f8ccef20543cb"; // sandbox test key
-const SM_SERVICE_ID = 206180; // Sales Appointment service
+// API key: set VITE_SM_API_KEY in Vercel environment variables (never commit the real key)
+const SM_API_KEY    = import.meta.env.VITE_SM_API_KEY || "d23d99de62b94383b87f8ccef20543cb";
+const SM_SERVICE_ID = 206180; // Sales Appointment service (id confirmed from SM admin)
 
 async function smAddLead({ firstName, lastName, phone, email, address, city, state, zip, note, staffNotes }) {
   const fullName = `${firstName} ${lastName}`.trim();
