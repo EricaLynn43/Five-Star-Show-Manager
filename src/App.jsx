@@ -2303,11 +2303,11 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
               {filtered.length > 0 && (
                 <tfoot>
                   <tr style={{ background:"#F7F2EB", borderTop:"2px solid #EDE6DC" }}>
-                    <td colSpan={5} style={{ padding:"13px 18px", fontWeight:700, fontSize:14, color:"#4B5563" }}>
+                    <td colSpan={6} style={{ padding:"13px 18px", fontWeight:700, fontSize:14, color:"#4B5563" }}>
                       {filtered.length} show{filtered.length !== 1 ? "s" : ""}
                     </td>
                     <td style={{ padding:"13px 18px", fontWeight:700, fontSize:15, color:"#1B3A5C" }}>{fmtMoney(totalShowCost)}</td>
-                    <td colSpan={4} />
+                    <td colSpan={3} />
                   </tr>
                 </tfoot>
               )}
