@@ -1225,6 +1225,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
           {/* LEFT — Show Details + Contact */}
           <div style={{ overflowY:"auto", padding:"18px 24px", borderRight:"1px solid #EDE6DC" }}>
             <p style={{ margin:"0 0 6px", fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Show Details</p>
+            {show.date && <Row label="Week #" value={`WK ${getISOWeek(new Date(show.date + "T12:00:00"))}`} accent={BRAND_BLUE} />}
             <Row label="Date" value={fmtDateRange(show.date, show.endDate)} />
             <Row label="Time" value={show.startTime && show.endTime ? show.startTime + " – " + show.endTime : null} />
             {(show.loadInDate || show.loadInTime) && <Row label="Load In" value={[show.loadInDate ? fmtDate(show.loadInDate) : null, show.loadInTime || null].filter(Boolean).join(" at ")} />}
@@ -1394,6 +1395,81 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
                     </div>
                   </div>
               }
+            </Widget>
+
+            {/* Performance & Results Widget */}
+            <Widget icon="📊" title="Performance & Results"
+              summary={(() => {
+                const leads = show.leadCount||0, goal = +show.goal||0;
+                if (goal > 0) return `${leads}/${goal} goal · ${show.appointmentCount||0} set`;
+                return leads > 0 ? `${leads} leads · ${show.appointmentCount||0} set` : "No results yet";
+              })()}>
+              {/* Stats grid */}
+              <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:14 }}>
+                {/* Goal */}
+                <div style={{ background:"#F7F2EB", borderRadius:9, padding:"10px 12px" }}>
+                  <div style={{ fontSize:11, color:"#6B7280", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:4 }}>Goal (Leads)</div>
+                  <input type="number" min="0" value={show.goal ?? ""}
+                    onChange={e => onUpdateShow({ ...show, goal: e.target.value===""?"":+e.target.value })}
+                    onBlur={e => onUpdateShow({ ...show, goal: +e.target.value||0 })}
+                    style={{ width:"100%", border:"none", borderBottom:"2px solid #EDE6DC", background:"transparent", fontSize:20, fontWeight:800, color:"#1B3A5C", outline:"none", fontFamily:"'Nunito',sans-serif", padding:"2px 0" }}
+                    placeholder="—" />
+                </div>
+                {/* Leads */}
+                <div style={{ background:(show.leadCount||0)>=(+show.goal||1)&&(+show.goal||0)>0?"#ECFDF5":"#F7F2EB", borderRadius:9, padding:"10px 12px" }}>
+                  <div style={{ fontSize:11, color:"#6B7280", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:4 }}>Leads</div>
+                  <div style={{ fontSize:20, fontWeight:800, color:"#1B3A5C" }}>{show.leadCount||0}</div>
+                </div>
+                {/* Set / Appts */}
+                <div style={{ background:"#F0F8FE", borderRadius:9, padding:"10px 12px" }}>
+                  <div style={{ fontSize:11, color:"#6B7280", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:4 }}>Set (Appts)</div>
+                  <div style={{ fontSize:20, fontWeight:800, color:BRAND_BLUE }}>{show.appointmentCount||0}</div>
+                </div>
+                {/* Last Year */}
+                <div style={{ background:"#F7F2EB", borderRadius:9, padding:"10px 12px" }}>
+                  <div style={{ fontSize:11, color:"#6B7280", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:4 }}>Last Year</div>
+                  <input type="number" min="0" value={show.lastYearLeads ?? ""}
+                    onChange={e => onUpdateShow({ ...show, lastYearLeads: e.target.value===""?"":+e.target.value })}
+                    onBlur={e => onUpdateShow({ ...show, lastYearLeads: +e.target.value||0 })}
+                    style={{ width:"100%", border:"none", borderBottom:"2px solid #EDE6DC", background:"transparent", fontSize:20, fontWeight:800, color:"#1B3A5C", outline:"none", fontFamily:"'Nunito',sans-serif", padding:"2px 0" }}
+                    placeholder="—" />
+                </div>
+              </div>
+              {/* Sales */}
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:"1px solid #F5EDE3" }}>
+                <span style={{ fontSize:14, color:"#6B7280", fontWeight:500 }}>Sales $</span>
+                <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                  <span style={{ fontSize:13, color:"#9CA3AF" }}>$</span>
+                  <input type="number" min="0" step="0.01" value={show.salesAmount ?? ""}
+                    onChange={e => onUpdateShow({ ...show, salesAmount: e.target.value===""?"":+e.target.value })}
+                    onBlur={e => onUpdateShow({ ...show, salesAmount: +e.target.value||0 })}
+                    style={{ width:90, textAlign:"right", border:"1px solid #EDE6DC", borderRadius:6, padding:"4px 8px", fontSize:14, fontWeight:700, color:"#1F2937", background:"#fff", outline:"none", fontFamily:"'Nunito',sans-serif" }}
+                    placeholder="0.00" />
+                </div>
+              </div>
+              {/* Renew */}
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"10px 0", borderBottom:"1px solid #F5EDE3" }}>
+                <span style={{ fontSize:14, color:"#6B7280", fontWeight:500 }}>Renew Next Year?</span>
+                <div style={{ display:"flex", gap:5 }}>
+                  {[["yes","✓ Yes","#10B981","#ECFDF5","#065F46"],["no","✗ No","#EF4444","#FEF2F2","#991B1B"],["maybe","~ Maybe","#F59E0B","#FFFBEB","#92400E"]].map(([v,lbl,border,bg,txt]) => (
+                    <button key={v} onClick={() => onUpdateShow({ ...show, renew: show.renew===v?"":v })}
+                      style={{ padding:"4px 10px", borderRadius:15, border:"2px solid", fontSize:12, fontWeight:700, cursor:"pointer", textTransform:"capitalize",
+                        borderColor: show.renew===v ? border : "#EDE6DC",
+                        background:  show.renew===v ? bg    : "#fff",
+                        color:       show.renew===v ? txt   : "#6B7280" }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Evaluation */}
+              <div style={{ paddingTop:10 }}>
+                <label style={{ fontSize:12, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.05em", display:"block", marginBottom:6 }}>Evaluation Notes</label>
+                <textarea value={show.evaluation || ""} rows={3}
+                  onChange={e => onUpdateShow({ ...show, evaluation: e.target.value })}
+                  placeholder="What worked, what didn't, would you return next year?"
+                  style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:"2px solid #EDE6DC", fontSize:13, color:"#1F2937", background:"#fff", outline:"none", boxSizing:"border-box", resize:"vertical", fontFamily:"'Nunito',sans-serif", lineHeight:1.5 }} />
+              </div>
             </Widget>
 
             {/* Staff + Shifts Widget */}
