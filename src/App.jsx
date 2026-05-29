@@ -1107,7 +1107,7 @@ function Widget({ icon, title, summary, children, defaultOpen=false }) {
   );
 }
 
-function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDuplicate, userId, onImmediateSave }) {
+function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDuplicate, userId, onImmediateSave, onAddShow }) {
   const assigned = employees.filter(e => (show.assignedEmployees || []).includes(e.id));
   const totalPaidCalc = (+show.depositPaid||0) + (+show.totalPaid||0);
   const balance = (+show.totalDue||0) - totalPaidCalc;
@@ -1148,6 +1148,56 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
   async function deleteComm(id) {
     if (!await confirm("Remove this communication entry?", { danger:true, confirmLabel:"Remove" })) return;
     onUpdateShow({ ...show, communications:comms.filter(c => c.id !== id) });
+  }
+
+  async function handleRenewYes() {
+    // If already set to yes, just toggle off
+    if (show.renew === "yes") { onUpdateShow({ ...show, renew: "" }); return; }
+    const ok = await confirm(
+      `Create next year's Event Lead for "${show.name}"?`,
+      { confirmLabel:"Create Event Lead",
+        subtext:"A copy will be added to your show list as an Event Lead with the date estimated one year out. Update the date once confirmed with the organizer." }
+    );
+    if (!ok) return;
+    // Advance date by 1 year (safe for leap years)
+    function advanceYear(dateStr) {
+      if (!dateStr) return "";
+      const d = new Date(dateStr + "T12:00:00");
+      d.setFullYear(d.getFullYear() + 1);
+      return d.toISOString().split("T")[0];
+    }
+    const originalYear = show.date ? new Date(show.date + "T12:00:00").getFullYear() : "prior";
+    const ntkPrefix = `⚠️ DATE TBD — confirm with organizer. Based on ${originalYear} show.`;
+    const newShow = {
+      ...show,
+      id: genId(),
+      status: "lead",
+      date: advanceYear(show.date),
+      endDate: advanceYear(show.endDate),
+      // Performance: carry forward this year's leads as "Last Year", reset everything else
+      leadCount: 0,
+      appointmentCount: 0,
+      lastYearLeads: show.leadCount || 0,
+      salesAmount: "",
+      renew: "",
+      evaluation: "",
+      // Finance: reset payments, keep expense estimates
+      payments: [],
+      depositPaid: 0,
+      depositPaidDate: "",
+      totalPaid: 0,
+      totalPaidDate: "",
+      // Activity: reset
+      showActive: false,
+      closedAt: null,
+      communications: [],
+      employeeReports: [],
+      checklist: (show.checklist || []).map(c => ({ ...c, checked: false })),
+      // Note the date is estimated
+      needToKnow: show.needToKnow ? `${ntkPrefix}\n\n${show.needToKnow}` : ntkPrefix,
+    };
+    if (onAddShow) onAddShow(newShow);
+    onUpdateShow({ ...show, renew: "yes" });
   }
 
   const Row = ({ label, value, accent }) => (
@@ -1320,7 +1370,8 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
                 <span style={{ fontSize:14, color:"#6B7280", fontWeight:500 }}>Renew Next Year?</span>
                 <div style={{ display:"flex", gap:5 }}>
                   {[["yes","✓ Yes","#10B981","#ECFDF5","#065F46"],["no","✗ No","#EF4444","#FEF2F2","#991B1B"],["maybe","~ Maybe","#F59E0B","#FFFBEB","#92400E"]].map(([v,lbl,border,bg,txt]) => (
-                    <button key={v} onClick={() => onUpdateShow({ ...show, renew: show.renew===v?"":v })}
+                    <button key={v}
+                      onClick={() => v === "yes" ? handleRenewYes() : onUpdateShow({ ...show, renew: show.renew===v?"":v })}
                       style={{ padding:"4px 10px", borderRadius:15, border:"2px solid", fontSize:12, fontWeight:700, cursor:"pointer",
                         borderColor: show.renew===v ? border : "#EDE6DC",
                         background:  show.renew===v ? bg    : "#fff",
@@ -4024,6 +4075,14 @@ export default function App() {
             const updatedShows = shows.map(s => s.id === updatedShow.id ? updatedShow : s);
             await supabase.from("user_data").upsert(
               { owner_id:user.id, shows:updatedShows, employees, location_name:locationName, notif_timing:notifTiming },
+              { onConflict:"owner_id" }
+            );
+          }}
+          onAddShow={newShow => {
+            const updated = [...shows, newShow];
+            setShows(updated);
+            supabase.from("user_data").upsert(
+              { owner_id:user.id, shows:updated, employees, location_name:locationName, notif_timing:notifTiming },
               { onConflict:"owner_id" }
             );
           }}
