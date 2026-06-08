@@ -354,6 +354,7 @@ function LoginScreen() {
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState("");
   const [magicSent, setMagicSent] = useState(false);
+  const [showPw,   setShowPw]   = useState(false);
 
   async function handleSignIn(e) {
     e.preventDefault();
@@ -412,10 +413,17 @@ function LoginScreen() {
               <label style={{ display:"block", fontSize:15, fontWeight:700, color:"#374151", marginBottom:7 }}>Email Address</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@fivestar.com" style={inputStyle} />
             </div>
-            <div style={{ marginBottom:24 }}>
+            <div style={{ marginBottom:14 }}>
               <label style={{ display:"block", fontSize:15, fontWeight:700, color:"#374151", marginBottom:7 }}>Password</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" style={inputStyle} />
+              <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" style={inputStyle} />
             </div>
+            <button type="button" onClick={() => setShowPw(v => !v)}
+              style={{ display:"flex", alignItems:"center", gap:10, background:"none", border:"none", cursor:"pointer", padding:"6px 0", marginBottom:22, color:"#1B3A5C", fontSize:15, fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>
+              <span style={{ width:24, height:24, borderRadius:6, border:"2px solid #1B3A5C", background: showPw ? "#1B3A5C" : "#fff", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                {showPw && <span style={{ color:"#fff", fontSize:14, fontWeight:700 }}>✓</span>}
+              </span>
+              {showPw ? "👁 Hide password" : "👁 Show password"}
+            </button>
             <button type="submit" disabled={loading}
               style={{ width:"100%", padding:"16px", borderRadius:12, border:"none", background:BRAND_BLUE, color:"#fff", fontSize:17, fontWeight:700, cursor:loading?"wait":"pointer", marginBottom:14, opacity:loading?0.7:1, fontFamily:"'Nunito',sans-serif" }}>
               {loading ? "Signing In…" : "Sign In"}
@@ -451,6 +459,7 @@ function SetPasswordScreen() {
   const [loading,  setLoading]  = useState(false);
   const [done,     setDone]     = useState(false);
   const [error,    setError]    = useState("");
+  const [showPw,   setShowPw]   = useState(false);
 
   async function handleSet(e) {
     e.preventDefault();
@@ -487,12 +496,19 @@ function SetPasswordScreen() {
             )}
             <div style={{ marginBottom:18 }}>
               <label style={{ display:"block", fontSize:15, fontWeight:700, color:"#374151", marginBottom:7 }}>New Password</label>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Minimum 8 characters" style={inputStyle} />
+              <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} required placeholder="Minimum 8 characters" style={inputStyle} />
             </div>
-            <div style={{ marginBottom:28 }}>
+            <div style={{ marginBottom:16 }}>
               <label style={{ display:"block", fontSize:15, fontWeight:700, color:"#374151", marginBottom:7 }}>Confirm Password</label>
-              <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required placeholder="Re-enter password" style={inputStyle} />
+              <input type={showPw ? "text" : "password"} value={confirm} onChange={e => setConfirm(e.target.value)} required placeholder="Re-enter password" style={inputStyle} />
             </div>
+            <button type="button" onClick={() => setShowPw(v => !v)}
+              style={{ display:"flex", alignItems:"center", gap:10, background:"none", border:"none", cursor:"pointer", padding:"6px 0", marginBottom:24, color:"#1B3A5C", fontSize:15, fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>
+              <span style={{ width:24, height:24, borderRadius:6, border:"2px solid #1B3A5C", background: showPw ? "#1B3A5C" : "#fff", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+                {showPw && <span style={{ color:"#fff", fontSize:14, fontWeight:700 }}>✓</span>}
+              </span>
+              {showPw ? "👁 Hide password" : "👁 Show password"}
+            </button>
             <button type="submit" disabled={loading}
               style={{ width:"100%", padding:"16px", borderRadius:12, border:"none", background:"#1B3A5C", color:"#fff", fontSize:17, fontWeight:700, cursor:loading?"wait":"pointer", opacity:loading?0.7:1, fontFamily:"'Nunito',sans-serif" }}>
               {loading ? "Saving…" : "Set Password & Continue"}
@@ -720,7 +736,7 @@ const EMPTY_SHOW = { name:"", date:"", endDate:"", startTime:"", endTime:"", loa
   employeesNeeded:"", contactsCollected:"", depositDue:"", depositDueDate:"",
   depositPaid:"", depositPaidDate:"", totalDue:"", finalPaymentDueDate:"",
   totalPaid:"", totalPaidDate:"", assignedEmployees:[], employeeReports:[], needToKnow:"",
-  inventory:[], checklist:[], communications:[], documents:[], shifts:[], rating:null, ratingNotes:"" };
+  inventory:[], checklist:[], communications:[], documents:[], photos:[], shifts:[], rating:null, ratingNotes:"" };
 
 function CalendarPicker({ value, onChange, label, required }) {
   const [open, setOpen] = useState(false);
@@ -850,6 +866,7 @@ function AddressAutocomplete({ value, onChange, onPlaceSelected }) {
 
 function ShowFormModal({ show, employees, onSave, onClose }) {
   const [form, setForm] = useState(show ? { ...show } : { ...EMPTY_SHOW });
+  const isAdd = !show;
   function set(k, v) { setForm(p => ({ ...p, [k]:v })); }
   function toggleEmp(id) {
     setForm(p => ({ ...p, assignedEmployees: p.assignedEmployees.includes(id)
@@ -907,6 +924,15 @@ function ShowFormModal({ show, employees, onSave, onClose }) {
               {STATUS_ORDER.map(k => <option key={k} value={k}>{STATUSES[k].label}</option>)}
             </select>
           </div>
+          {isAdd && (
+            <div style={{ gridColumn:"1/-1", display:"flex", gap:10, alignItems:"flex-start", background:"#F0F8FE", border:"1px solid #BAE6FD", borderRadius:10, padding:"12px 14px", marginTop:4 }}>
+              <span style={{ fontSize:18, lineHeight:1.3 }}>💡</span>
+              <p style={{ margin:0, fontSize:13.5, color:"#374151", lineHeight:1.5 }}>
+                Just the basics to get started. Once the show is created, open it to add <b>financials, staffing, the checklist, and more</b> — each section appears as you need it.
+              </p>
+            </div>
+          )}
+          {!isAdd && (<>
           {inp("Start Time","startTime","time")}
           {inp("End Time","endTime","time")}
           <CalendarPicker value={form.loadInDate} onChange={v => set("loadInDate",v)} label="Load In Date" />
@@ -995,6 +1021,7 @@ function ShowFormModal({ show, employees, onSave, onClose }) {
           <CalendarPicker value={form.depositPaidDate} onChange={v => set("depositPaidDate",v)} label="Date Deposit Paid" />
           {money("Balance / Final Payment","totalPaid")}
           <CalendarPicker value={form.totalPaidDate} onChange={v => set("totalPaidDate",v)} label="Date Balance Paid" />
+          </>)}
         </div>
         <div style={{ padding:"20px 32px", borderTop:"1px solid #EDE6DC", display:"flex", gap:12, justifyContent:"flex-end", background:"#fff" }}>
           <button onClick={onClose} style={{ padding:"13px 24px", borderRadius:10, border:"2px solid #EDE6DC", background:"#fff", color:"#6B7280", fontSize:15, cursor:"pointer", fontWeight:600 }}>Cancel</button>
@@ -1226,6 +1253,51 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
   const daysUntil = show.date ? Math.ceil((new Date(show.date) - today) / (1000*60*60*24)) : null;
   function toggleCheckItem(id) { onUpdateShow({ ...show, checklist:checkItems.map(c => c.id===id ? { ...c, checked:!c.checked } : c) }); }
 
+  // ── Lifecycle-based widget reveal (hybrid: show by stage, by data, or when manually added) ──
+  const [addedSections, setAddedSections] = useState(() => new Set());
+  const [showAddMenu, setShowAddMenu] = useState(false);
+  // Earliest lifecycle stage at which each section auto-appears (index into STATUS_ORDER)
+  const SECTION_STAGE = { commlog:0, financials:1, payments:1, staff:2, inventory:2, documents:2, performance:2, checklist:3, reports:4, rating:4 };
+  // Sections Kathy can pull in early from the "+ Add section" menu (excludes auto/post-show widgets that fill themselves)
+  const ADDABLE = ["commlog","financials","payments","staff","inventory","documents","photos","checklist","performance"];
+  const SECTION_META = {
+    commlog:     { icon:"💬", label:"Communication Log" },
+    financials:  { icon:"💰", label:"Financials" },
+    payments:    { icon:"💳", label:"Payments" },
+    staff:       { icon:"👥", label:"Staff & Shifts" },
+    checklist:   { icon:"✅", label:"Pre-Show Checklist" },
+    reports:     { icon:"📊", label:"Employee Reports" },
+    rating:      { icon:"⭐", label:"Show Rating" },
+    inventory:   { icon:"📦", label:"Inventory" },
+    documents:   { icon:"📄", label:"Documents" },
+    photos:      { icon:"📷", label:"Show Photos" },
+    performance: { icon:"📈", label:"Performance & Results" },
+  };
+  const curStage = Math.max(0, STATUS_ORDER.indexOf(show.status));
+  const sectionHasData = {
+    commlog:     comms.length > 0,
+    financials:  totalExpenses > 0 || !!show.paymentNotes,
+    payments:    payments.length > 0,
+    staff:       assigned.length > 0 || (show.shifts||[]).length > 0 || !!show.employeesNeeded,
+    checklist:   checkItems.length > 0,
+    reports:     (show.employeeReports||[]).length > 0,
+    rating:      !!show.rating,
+    inventory:   (show.inventory||[]).length > 0,
+    documents:   (show.documents||[]).length > 0,
+    photos:      (show.photos||[]).length > 0,
+    performance: !!(show.leadCount || show.goal || show.appointmentCount || show.salesAmount || show.evaluation || show.renew || show.lastYearLeads),
+  };
+  // Photos appear once the show goes live (Start Show), stay for closed shows, or whenever they hold data / are added manually.
+  const showIsLiveOrDone = show.showActive || !!show.startedAt || !!show.closedAt;
+  const isVisible = key => key === "photos"
+    ? (showIsLiveOrDone || sectionHasData.photos || addedSections.has(key))
+    : (curStage >= (SECTION_STAGE[key] ?? 0) || sectionHasData[key] || addedSections.has(key));
+  const hiddenSections = ADDABLE.filter(k => !isVisible(k));
+  function addSection(key) {
+    setAddedSections(prev => new Set(prev).add(key));
+    setShowAddMenu(false);
+  }
+
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.55)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
@@ -1323,7 +1395,8 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
           <div style={{ overflowY:"auto", padding:"14px 18px" }}>
 
           {/* Performance & Results Widget — TOP */}
-            <Widget icon="📊" title="Performance & Results"
+            {isVisible("performance") && (
+            <Widget icon="📈" title="Performance & Results"
               summary={(() => {
                 const leads = show.leadCount||0, goal = +show.goal||0;
                 if (goal > 0) return `${leads}/${goal} goal · ${show.appointmentCount||0} set`;
@@ -1389,8 +1462,10 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
                   style={{ width:"100%", padding:"10px 12px", borderRadius:8, border:"2px solid #EDE6DC", fontSize:13, color:"#1F2937", background:"#fff", outline:"none", boxSizing:"border-box", resize:"vertical", fontFamily:"'Nunito',sans-serif", lineHeight:1.5 }} />
               </div>
             </Widget>
+            )}
 
           {/* Financials Widget */}
+            {isVisible("financials") && (
             <Widget icon="💰" title="Financials" summary={totalExpenses > 0 ? `${fmtMoney(totalExpenses)} total cost` : "No costs entered yet"} defaultOpen={true}>
               <p style={{ margin:"0 0 8px", fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Expense Breakdown</p>
               {EXPENSE_FIELDS.map(f => (
@@ -1423,8 +1498,10 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
                 style={{ width:"100%", padding:"8px 10px", borderRadius:8, border:"1px solid #EDE6DC", fontSize:14, color:"#1F2937", outline:"none", boxSizing:"border-box", resize:"vertical", fontFamily:"'Nunito',sans-serif", lineHeight:1.5 }}
               />
             </Widget>
+            )}
 
             {/* Payments Widget */}
+            {isVisible("payments") && (
             <Widget icon="💳" title="Payments"
               summary={payments.length > 0 ? `${fmtMoney(totalPaid)} paid · ${fmtMoney(Math.max(0,remaining))} remaining` : "No payments logged"}
               defaultOpen={true}>
@@ -1514,8 +1591,10 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
                   </div>
               }
             </Widget>
+            )}
 
             {/* Staff + Shifts Widget */}
+            {isVisible("staff") && (
             <Widget icon="👥" title="Staff & Shifts" summary={`${assigned.length} of ${show.employeesNeeded||0} needed assigned`} defaultOpen={true}>
               {assigned.length === 0
                 ? <p style={{ color:"#9CA3AF", margin:"0 0 14px", fontSize:14 }}>No employees assigned yet.</p>
@@ -1533,10 +1612,21 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
               }
               <ShiftScheduler show={show} employees={employees} onUpdateShow={onUpdateShow} />
             </Widget>
+            )}
 
             {/* Checklist Widget */}
-            {(show.status === "countdown" || show.status === "complete") && checkItems.length > 0 && (
-              <Widget icon="✅" title="Pre-Show Checklist" summary={`${checkDone}/${checkItems.length} complete · ${checkPct}%`} defaultOpen={checkPct < 100}>
+            {isVisible("checklist") && (
+              <Widget icon="✅" title="Pre-Show Checklist" summary={checkItems.length > 0 ? `${checkDone}/${checkItems.length} complete · ${checkPct}%` : "Not started"} defaultOpen={checkPct < 100}>
+                {checkItems.length === 0 && (
+                  <div style={{ textAlign:"center", padding:"14px 0" }}>
+                    <p style={{ margin:"0 0 10px", fontSize:14, color:"#6B7280" }}>No checklist yet.</p>
+                    <button onClick={() => onUpdateShow({ ...show, checklist: DEFAULT_CHECKLIST() })}
+                      style={{ fontSize:13, fontWeight:700, color:"#fff", background:"#1B3A5C", border:"none", borderRadius:8, padding:"8px 16px", cursor:"pointer" }}>
+                      Load Standard Checklist
+                    </button>
+                  </div>
+                )}
+                {checkItems.length > 0 && (<>
                 <div style={{ background:checkDone===checkItems.length?"#ECFDF5":"#FFF1F2", border:"1px solid "+(checkDone===checkItems.length?"#6EE7B7":"#FCA5A5"), borderRadius:10, padding:"10px 14px", marginBottom:12, display:"flex", alignItems:"center", gap:10 }}>
                   <span style={{ fontSize:18 }}>{checkDone===checkItems.length?"🎉":"🚨"}</span>
                   <div style={{ flex:1 }}>
@@ -1563,11 +1653,12 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
                     </span>
                   </div>
                 ))}
+                </>)}
               </Widget>
             )}
 
             {/* Employee Reports Widget */}
-            {(show.employeeReports||[]).length > 0 && (() => {
+            {isVisible("reports") && (show.employeeReports||[]).length > 0 && (() => {
               const reports = show.employeeReports;
               const totalLeads = reports.reduce((a,r) => a+(+r.leadsAcquired||0), 0);
               const totalAppts = reports.reduce((a,r) => a+(+r.appointmentsBooked||0), 0);
@@ -1595,7 +1686,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
             })()}
 
             {/* Show Rating Widget */}
-            {show.status === "complete" && (
+            {isVisible("rating") && (
               <Widget icon="⭐" title="Show Rating" summary={show.rating ? "★".repeat(show.rating) : "Not yet rated"}>
                 <StarRating value={show.rating} onChange={r => onUpdateShow({ ...show, rating:r })} size={30} />
                 {show.rating && (
@@ -1607,16 +1698,30 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
             )}
 
             {/* Inventory Widget */}
+            {isVisible("inventory") && (
             <Widget icon="📦" title="Inventory">
               <InventorySection show={show} onUpdateShow={onUpdateShow} />
             </Widget>
+            )}
 
             {/* Documents Widget */}
+            {isVisible("documents") && (
             <Widget icon="📄" title="Documents">
               <DocumentsSection show={show} onUpdateShow={onUpdateShow} userId={userId} />
             </Widget>
+            )}
+
+            {/* Show Photos Widget */}
+            {isVisible("photos") && (
+            <Widget icon="📷" title="Show Photos"
+              summary={(show.photos||[]).length > 0 ? `${(show.photos||[]).length} photo${(show.photos||[]).length===1?"":"s"}` : "Arrival & tear-down"}
+              defaultOpen={!!show.showActive}>
+              <PhotosSection show={show} onUpdateShow={onUpdateShow} userId={userId} />
+            </Widget>
+            )}
 
             {/* Communications Widget */}
+            {isVisible("commlog") && (
             <Widget icon="💬" title="Communication Log" summary={comms.length > 0 ? `${comms.length} logged` : "None logged"}>
               <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:12 }}>
                 {!addingComm && (
@@ -1678,6 +1783,36 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
                   })
               }
             </Widget>
+            )}
+
+            {/* ── Add a section (lifecycle-aware) ── */}
+            {hiddenSections.length > 0 && (
+              <div style={{ marginTop:6 }}>
+                {!showAddMenu
+                  ? <button onClick={() => setShowAddMenu(true)}
+                      style={{ width:"100%", padding:"11px", borderRadius:12, border:"2px dashed #C7BBA8", background:"#FBF8F3", color:"#6B7280", fontSize:14, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                      <span style={{ fontSize:18, lineHeight:1 }}>+</span> Add a section
+                    </button>
+                  : <div style={{ border:"1px solid #EDE6DC", borderRadius:12, padding:12, background:"#fff" }}>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+                        <span style={{ fontSize:13, fontWeight:800, color:"#1B3A5C", textTransform:"uppercase", letterSpacing:"0.05em" }}>Add a section</span>
+                        <button onClick={() => setShowAddMenu(false)}
+                          style={{ background:"none", border:"none", color:"#9CA3AF", fontSize:18, cursor:"pointer", lineHeight:1, padding:2 }}>×</button>
+                      </div>
+                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
+                        {hiddenSections.map(key => (
+                          <button key={key} onClick={() => addSection(key)}
+                            style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderRadius:10, border:"1px solid #EDE6DC", background:"#FBF8F3", color:"#1F2937", fontSize:13, fontWeight:700, cursor:"pointer", textAlign:"left" }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor="#1B3A5C"; e.currentTarget.style.background="#F0F8FE"; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor="#EDE6DC"; e.currentTarget.style.background="#FBF8F3"; }}>
+                            <span style={{ fontSize:16 }}>{SECTION_META[key].icon}</span>{SECTION_META[key].label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                }
+              </div>
+            )}
 
           </div>{/* end right widgets column */}
         </div>{/* end two-column grid */}
@@ -1997,6 +2132,124 @@ function DocumentsSection({ show, onUpdateShow, userId }) {
           </div>
         ))
       }
+      {ConfirmDialog}
+    </div>
+  );
+}
+
+// ─── Show Photos Section (arrival / tear-down photos, taken on-site) ────────
+const PHOTO_LABELS = [
+  { key:"Arrival",   icon:"🚪", color:"#1E40AF", bg:"#EFF6FF", border:"#93C5FD" },
+  { key:"Tear-Down", icon:"📦", color:"#9A3412", bg:"#FFF7ED", border:"#FDBA74" },
+  { key:"Other",     icon:"📷", color:"#4B5563", bg:"#F3F4F6", border:"#D1D5DB" },
+];
+function PhotosSection({ show, onUpdateShow, userId }) {
+  const photos = show.photos || [];
+  const [uploading, setUploading] = useState(false);
+  const [urls, setUrls] = useState({});      // photo.id -> signed url for thumbnail
+  const [lightbox, setLightbox] = useState(null);
+  const pendingLabel = useRef("Arrival");
+  const fileRef = useRef(null);
+  const { confirm, ConfirmDialog } = useConfirm();
+
+  // Fetch signed thumbnail URLs for any photos we don't have one for yet
+  const photoKey = photos.map(p => p.id).join(",");
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const missing = photos.filter(p => !urls[p.id]);
+      if (missing.length === 0) return;
+      const entries = await Promise.all(missing.map(async p => {
+        const { data } = await supabase.storage.from("show-documents").createSignedUrl(p.path, 3600);
+        return [p.id, data?.signedUrl || ""];
+      }));
+      if (!cancelled) setUrls(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+    })();
+    return () => { cancelled = true; };
+  }, [photoKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function pick(label) { pendingLabel.current = label; if (fileRef.current) fileRef.current.click(); }
+
+  async function handleUpload(e) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setUploading(true);
+    try {
+      const added = [];
+      for (const file of files) {
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+        const path = `${userId}/${show.id}/photos/${Date.now()}_${added.length}_${safeName}`;
+        const { error } = await supabase.storage.from("show-documents").upload(path, file);
+        if (error) throw error;
+        added.push({ id: genId(), name: file.name, size: file.size, type: file.type, path, label: pendingLabel.current, uploadedAt: new Date().toISOString() });
+      }
+      onUpdateShow({ ...show, photos: [...photos, ...added] });
+    } catch (err) {
+      alert("Photo upload failed: " + err.message);
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function handleDelete(photo) {
+    if (!await confirm("Delete this photo?", { danger:true, confirmLabel:"Delete", subtext:"This cannot be undone." })) return;
+    await supabase.storage.from("show-documents").remove([photo.path]);
+    onUpdateShow({ ...show, photos: photos.filter(p => p.id !== photo.id) });
+    setUrls(prev => { const n = { ...prev }; delete n[photo.id]; return n; });
+  }
+
+  const meta = label => PHOTO_LABELS.find(l => l.key === label) || PHOTO_LABELS[2];
+
+  return (
+    <div>
+      {/* Capture buttons — tapping opens the camera/photo library on a phone */}
+      <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:14 }}>
+        {PHOTO_LABELS.map(l => (
+          <button key={l.key} onClick={() => pick(l.key)} disabled={uploading}
+            style={{ display:"flex", alignItems:"center", gap:7, padding:"10px 16px", borderRadius:10, border:`2px solid ${l.border}`, background:l.bg, color:l.color, fontSize:14, fontWeight:700, cursor:uploading?"not-allowed":"pointer", opacity:uploading?0.6:1 }}>
+            <span style={{ fontSize:16 }}>{l.icon}</span> {l.key}
+          </button>
+        ))}
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" multiple style={{ display:"none" }} onChange={handleUpload} />
+      {uploading && <p style={{ color:"#1B3A5C", fontSize:14, fontWeight:700, margin:"0 0 12px" }}>Uploading photo…</p>}
+
+      {photos.length === 0
+        ? <p style={{ color:"#9CA3AF", margin:0, fontSize:14 }}>No photos yet. Snap one when you arrive and another at tear-down — tap a button above.</p>
+        : <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(120px, 1fr))", gap:10 }}>
+            {photos.map(p => {
+              const m = meta(p.label);
+              return (
+                <div key={p.id} style={{ position:"relative", borderRadius:10, overflow:"hidden", border:`1px solid ${m.border}`, background:"#F7F2EB" }}>
+                  <div onClick={() => urls[p.id] && setLightbox(urls[p.id])}
+                    style={{ width:"100%", aspectRatio:"1/1", background:"#EDE6DC", cursor:urls[p.id]?"pointer":"default", display:"flex", alignItems:"center", justifyContent:"center" }}>
+                    {urls[p.id]
+                      ? <img src={urls[p.id]} alt={p.label} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                      : <span style={{ fontSize:24, color:"#9CA3AF" }}>📷</span>}
+                  </div>
+                  <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"6px 8px", gap:6 }}>
+                    <span style={{ fontSize:11, fontWeight:700, color:m.color, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{m.icon} {p.label}</span>
+                    <button onClick={() => handleDelete(p)}
+                      style={{ background:"none", border:"none", color:"#D1D5DB", fontSize:16, cursor:"pointer", lineHeight:1, padding:0, flexShrink:0 }}
+                      onMouseEnter={e => e.currentTarget.style.color="#EF4444"}
+                      onMouseLeave={e => e.currentTarget.style.color="#D1D5DB"}>×</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+      }
+
+      {/* Lightbox */}
+      {lightbox && (
+        <div onClick={() => setLightbox(null)}
+          style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.85)", zIndex:2000, display:"flex", alignItems:"center", justifyContent:"center", padding:20 }}>
+          <img src={lightbox} alt="" style={{ maxWidth:"100%", maxHeight:"100%", borderRadius:10, boxShadow:"0 8px 40px rgba(0,0,0,0.5)" }} />
+          <button onClick={() => setLightbox(null)}
+            style={{ position:"absolute", top:20, right:20, background:"rgba(255,255,255,0.18)", border:"none", color:"#fff", fontSize:26, cursor:"pointer", borderRadius:"50%", width:44, height:44 }}>×</button>
+        </div>
+      )}
       {ConfirmDialog}
     </div>
   );
@@ -3325,7 +3578,7 @@ const data = await smSlotSearch({ contactId, zip: savedZip, startDate: bookingDa
 }
 
 // ─── Employee Portal ───────────────────────────────────────────────────────
-function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, lockedEmployeeId, userEmail }) {
+function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, lockedEmployeeId, userEmail, userId }) {
   const [selectedId, setSelectedId] = useState(lockedEmployeeId ? Number(lockedEmployeeId) : null);
   const [surveyShow, setSurveyShow] = useState(null);
   const [leadShow,   setLeadShow]   = useState(null);
@@ -3482,6 +3735,11 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
                 style={{ width:"100%", padding:"13px", borderRadius:10, border:"none", background:"#16A34A", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:7 }}>
                 ➕ Add Lead
               </button>
+              {/* Arrival / tear-down photos — hosts snap these on-site */}
+              <div style={{ marginTop:14, paddingTop:14, borderTop:"1px solid #E5E7EB" }}>
+                <div style={{ fontSize:13, fontWeight:700, color:"#6B7280", textTransform:"uppercase", letterSpacing:"0.05em", marginBottom:10 }}>📷 Show Photos</div>
+                <PhotosSection show={show} onUpdateShow={onUpdateShow} userId={userId} />
+              </div>
             </div>
           );
         })}
@@ -3882,6 +4140,7 @@ export default function App() {
             }}
             notifTiming={notifTiming}
             lockedEmployeeId={previewEmployeeId}
+            userId={user?.id}
           />
         </div>
       </>
@@ -3932,6 +4191,7 @@ export default function App() {
             notifTiming={notifTiming}
             lockedEmployeeId={employeeRecordId}
             userEmail={user?.email}
+            userId={ownerUserId || user?.id}
           />
         </div>
       </>
@@ -4056,7 +4316,7 @@ export default function App() {
                 { onConflict:"owner_id" }
               );
               if (error) console.error("Portal save error:", error);
-            }} notifTiming={notifTiming} userEmail={user?.email} />}
+            }} notifTiming={notifTiming} userEmail={user?.email} userId={user?.id} />}
         </div>
       </div>
 
