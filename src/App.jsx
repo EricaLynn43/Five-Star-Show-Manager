@@ -1134,7 +1134,7 @@ function Widget({ icon, title, summary, children, defaultOpen=false }) {
   );
 }
 
-function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDuplicate, userId, onImmediateSave, onAddShow }) {
+function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDuplicate, onDelete, userId, onImmediateSave, onAddShow }) {
   const assigned = employees.filter(e => (show.assignedEmployees || []).includes(e.id));
   const totalPaidCalc = (+show.depositPaid||0) + (+show.totalPaid||0);
   const balance = (+show.totalDue||0) - totalPaidCalc;
@@ -1826,6 +1826,14 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
             onMouseLeave={e => { e.currentTarget.style.borderColor="#EDE6DC"; e.currentTarget.style.color="#6B7280"; }}>
             ⧉ Duplicate
           </button>
+          {onDelete && (
+            <button onClick={async () => { if (await confirm(`Delete "${show.name}"?`, { danger:true, confirmLabel:"Delete", subtext:"This permanently removes the show and cannot be undone." })) { onDelete(show.id); onClose(); } }}
+              style={{ padding:"13px 18px", borderRadius:11, border:"2px solid #FECACA", background:"#FEF2F2", color:"#DC2626", fontSize:14, fontWeight:700, cursor:"pointer" }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor="#DC2626"; e.currentTarget.style.background="#FEE2E2"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor="#FECACA"; e.currentTarget.style.background="#FEF2F2"; }}>
+            🗑 Delete
+          </button>
+          )}
         </div>
 
         {ConfirmDialog}
@@ -4330,6 +4338,7 @@ export default function App() {
           onClose={() => setViewing(null)}
           onUpdateShow={updateShow}
           onDuplicate={() => duplicateShow(viewingShow)}
+          onDelete={id => setShows(p => p.filter(s => s.id !== id))}
           userId={user?.id}
           onImmediateSave={async (updatedShow) => {
             const updatedShows = shows.map(s => s.id === updatedShow.id ? updatedShow : s);
