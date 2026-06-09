@@ -732,7 +732,7 @@ function EmployeesView({ employees, shows, onUpdateEmployee, onAddEmployee, onDe
 // ─── Show Form Modal ────────────────────────────────────────────────────────
 const EMPTY_SHOW = { name:"", date:"", endDate:"", startTime:"", endTime:"", loadInDate:"", loadInTime:"", tearDownDate:"", tearDownTime:"", category:"", status:"lead",
   street:"", city:"", state:"", zip:"", contactName:"", contactEmail:"", contactPhone:"",
-  boothSize:"", expectedParticipation:"", isIndoor:true, hasElectrical:false, needsTrailer:false,
+  boothSize:"", boothNumber:"", expectedParticipation:"", isIndoor:true, hasElectrical:false, needsTrailer:false,
   employeesNeeded:"", contactsCollected:"", depositDue:"", depositDueDate:"",
   depositPaid:"", depositPaidDate:"", totalDue:"", finalPaymentDueDate:"",
   totalPaid:"", totalPaidDate:"", assignedEmployees:[], employeeReports:[], needToKnow:"",
@@ -1338,6 +1338,17 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
                 <p style={{ margin:0, fontSize:14, color:"#1F2937", lineHeight:1.6, whiteSpace:"pre-wrap" }}>{show.needToKnow}</p>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ── Assigned Booth # (available from Final Countdown onward, or once set) ── */}
+        {(show.status === "countdown" || show.status === "complete" || show.showActive || show.boothNumber) && (
+          <div style={{ background:"#EFF6FF", borderBottom:"1px solid #93C5FD", padding:"10px 28px", flexShrink:0, display:"flex", alignItems:"center", gap:12 }}>
+            <span style={{ fontSize:16, flexShrink:0 }}>📍</span>
+            <div style={{ fontSize:11, fontWeight:700, color:"#1E40AF", textTransform:"uppercase", letterSpacing:"0.06em", whiteSpace:"nowrap" }}>Assigned Booth #</div>
+            <input value={show.boothNumber || ""} onChange={e => onUpdateShow({ ...show, boothNumber: e.target.value })}
+              placeholder="e.g. 214 · Row C"
+              style={{ flex:1, maxWidth:260, border:"2px solid #BFDBFE", borderRadius:8, padding:"7px 12px", fontSize:15, fontWeight:700, color:"#1B3A5C", background:"#fff", outline:"none", fontFamily:"'Nunito',sans-serif", boxSizing:"border-box" }} />
           </div>
         )}
 
@@ -2282,6 +2293,7 @@ const IMPORT_FIELDS = [
   { key:"totalDue",     label:"Total Show Cost", aliases:["cost","total cost","show cost","total due","price","fee","amount","total"] },
   { key:"depositDue",   label:"Deposit Due",     aliases:["deposit","deposit due","deposit amount"] },
   { key:"boothSize",    label:"Booth Size",      aliases:["booth","booth size","space size"] },
+  { key:"boothNumber",  label:"Booth Number",    aliases:["booth number","booth #","booth no","assigned booth","space number","space #","booth assignment","booth location"] },
   { key:"needToKnow",   label:"Notes",           aliases:["notes","need to know","comments","description","details","info"] },
 ];
 
@@ -3693,6 +3705,14 @@ function EmployeePortalView({ employees, shows, onUpdateShow, notifTiming, locke
                   {show.category && <div style={{ fontSize:13, color:"#9CA3AF", marginTop:3 }}>{show.category}</div>}
                 </div>
                 <span style={{ fontSize:12, fontWeight:700, background:"#DCFCE7", color:"#15803D", borderRadius:20, padding:"4px 10px" }}>🟢 LIVE</span>
+              </div>
+              {/* Assigned booth — most important day-of info; tap to add if not set yet */}
+              <div style={{ display:"flex", alignItems:"center", gap:12, background:"#1B3A5C", borderRadius:11, padding:"12px 16px", marginBottom:10 }}>
+                <span style={{ fontSize:22, flexShrink:0 }}>📍</span>
+                <span style={{ fontSize:12, fontWeight:700, color:"rgba(255,255,255,0.7)", textTransform:"uppercase", letterSpacing:"0.06em", flexShrink:0 }}>Booth #</span>
+                <input value={show.boothNumber || ""} onChange={e => onUpdateShow({ ...show, boothNumber: e.target.value })}
+                  placeholder="Tap to add"
+                  style={{ flex:1, minWidth:0, border:"none", borderBottom:"2px solid rgba(255,255,255,0.3)", background:"transparent", color:"#fff", fontSize:20, fontWeight:800, outline:"none", fontFamily:"'Nunito',sans-serif", padding:"2px 0" }} />
               </div>
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
                 <div style={{ background:"#F0FDF4", borderRadius:9, padding:"10px 14px" }}>
