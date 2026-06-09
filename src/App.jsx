@@ -134,15 +134,41 @@ function getAssignedEmpIds(show) {
   return ids;
 }
 
+// Single source of truth: cost = totalDue, payments[] = what's paid.
+// Keeps legacy scalar fields (depositPaid/totalPaid) in sync so Reports/List/Dashboard stay correct,
+// and migrates older data (expense breakdown -> totalDue; scalar payments -> payments[]).
+function normalizeFinancials(show) {
+  let s = { ...show };
+  // ONE-TIME migration of older data (flagged so deleting all payments can't resurrect them)
+  if (!s._finMigrated) {
+    // a) legacy itemized expense breakdown -> single Total Show Cost (only if no cost set yet)
+    const expenseSum = EXPENSE_FIELDS.reduce((sum, f) => sum + (+s[f.key] || 0), 0);
+    if ((!s.totalDue || +s.totalDue === 0) && expenseSum > 0) s.totalDue = expenseSum;
+    // b) legacy scalar payments -> payments[] log (only if the log is empty)
+    if (!s.payments || s.payments.length === 0) {
+      const synth = [];
+      if (+s.depositPaid > 0) synth.push({ id: genId(),     amount:+s.depositPaid, date:s.depositPaidDate || "", type:"deposit", notes:"" });
+      if (+s.totalPaid   > 0) synth.push({ id: genId() + 1, amount:+s.totalPaid,   date:s.totalPaidDate   || "", type:"final",   notes:"" });
+      if (synth.length) s.payments = synth;
+    }
+    s._finMigrated = true;
+  }
+  // ALWAYS re-derive legacy scalars FROM the payments log (source of truth) so Reports/List/Dashboard stay accurate
+  const pays = s.payments || [];
+  s.depositPaid = pays.filter(p => p.type === "deposit").reduce((a, p) => a + (+p.amount || 0), 0);
+  s.totalPaid   = pays.filter(p => p.type !== "deposit").reduce((a, p) => a + (+p.amount || 0), 0);
+  return s;
+}
+
 function applyAutoStatus(show) {
-  if (show.status === "complete") {
+  let s = normalizeFinancials(show);
+  if (s.status === "complete") {
     // Ensure complete shows are never marked active (e.g. if status changed via form)
-    return show.showActive ? { ...show, showActive:false } : show;
+    return s.showActive ? { ...s, showActive:false } : s;
   }
   const today = new Date(); today.setHours(0, 0, 0, 0);
-  const showDate = show.date ? new Date(show.date) : null;
+  const showDate = s.date ? new Date(s.date) : null;
   const daysUntil = showDate ? Math.ceil((showDate - today) / (1000 * 60 * 60 * 24)) : 999;
-  let s = { ...show };
   if (s.status === "lead" && (+s.depositPaid || 0) > 0) s.status = "booked";
   if (s.status === "booked" && getAssignedEmpIds(s).size > 0) s.status = "preshow";
   if (s.status === "preshow" && daysUntil <= 7 && daysUntil >= 0) {
@@ -1150,10 +1176,10 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
   const { confirm, ConfirmDialog } = useConfirm();
   const today = new Date(); today.setHours(0,0,0,0);
 
-  const totalExpenses = EXPENSE_FIELDS.reduce((sum, f) => sum + (+show[f.key]||0), 0);
+  const cost       = +show.totalDue || 0;        // single Total Show Cost
   const payments   = show.payments || [];
   const totalPaid  = payments.reduce((sum, p) => sum + (+p.amount||0), 0);
-  const remaining  = totalExpenses - totalPaid;
+  const remaining  = cost - totalPaid;
 
   function savePayment() {
     if (!payAmount || +payAmount <= 0) { alert("Please enter a payment amount."); return; }
@@ -1257,13 +1283,12 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
   const [addedSections, setAddedSections] = useState(() => new Set());
   const [showAddMenu, setShowAddMenu] = useState(false);
   // Earliest lifecycle stage at which each section auto-appears (index into STATUS_ORDER)
-  const SECTION_STAGE = { commlog:0, financials:1, payments:1, staff:2, inventory:2, documents:2, performance:2, checklist:3, reports:4, rating:4 };
+  const SECTION_STAGE = { commlog:0, financials:1, staff:2, inventory:2, documents:2, performance:2, checklist:3, reports:4, rating:4 };
   // Sections Kathy can pull in early from the "+ Add section" menu (excludes auto/post-show widgets that fill themselves)
-  const ADDABLE = ["commlog","financials","payments","staff","inventory","documents","photos","checklist","performance"];
+  const ADDABLE = ["commlog","financials","staff","inventory","documents","photos","checklist","performance"];
   const SECTION_META = {
     commlog:     { icon:"💬", label:"Communication Log" },
     financials:  { icon:"💰", label:"Financials" },
-    payments:    { icon:"💳", label:"Payments" },
     staff:       { icon:"👥", label:"Staff & Shifts" },
     checklist:   { icon:"✅", label:"Pre-Show Checklist" },
     reports:     { icon:"📊", label:"Employee Reports" },
@@ -1276,8 +1301,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
   const curStage = Math.max(0, STATUS_ORDER.indexOf(show.status));
   const sectionHasData = {
     commlog:     comms.length > 0,
-    financials:  totalExpenses > 0 || !!show.paymentNotes,
-    payments:    payments.length > 0,
+    financials:  cost > 0 || payments.length > 0,
     staff:       assigned.length > 0 || (show.shifts||[]).length > 0 || !!show.employeesNeeded,
     checklist:   checkItems.length > 0,
     reports:     (show.employeeReports||[]).length > 0,
@@ -1297,6 +1321,22 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
     setAddedSections(prev => new Set(prev).add(key));
     setShowAddMenu(false);
   }
+
+  // ── Inline Show Info editing (replaces the old "Edit Show" form) ──
+  const [editingInfo, setEditingInfo] = useState(false);
+  const setF = (k, v) => onUpdateShow({ ...show, [k]: v });
+  function toggleEmpAssign(id) {
+    const cur = show.assignedEmployees || [];
+    setF("assignedEmployees", cur.includes(id) ? cur.filter(e => e !== id) : [...cur, id]);
+  }
+  const eStyle = { width:"100%", padding:"9px 11px", borderRadius:8, border:"2px solid #EDE6DC", fontSize:14, color:"#1F2937", background:"#fff", outline:"none", boxSizing:"border-box", fontFamily:"'Nunito',sans-serif" };
+  // Function-call helper (NOT a component) so inputs don't remount/lose focus on each keystroke
+  const eInp = (label, k, type) => (
+    <div style={{ marginBottom:10 }}>
+      <label style={{ display:"block", fontSize:12, fontWeight:700, color:"#6B7280", marginBottom:4 }}>{label}</label>
+      <input type={type || "text"} value={show[k] ?? ""} onChange={e => setF(k, e.target.value)} style={eStyle} />
+    </div>
+  );
 
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(15,23,42,0.55)", zIndex:1000, display:"flex", alignItems:"center", justifyContent:"center", padding:"20px" }}
@@ -1355,9 +1395,105 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
         {/* ── Two-column body ── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", flex:"1 1 0", minHeight:0, overflow:"hidden" }}>
 
-          {/* LEFT — Show Details + Contact */}
+          {/* LEFT — Show Details + Contact (view / inline edit) */}
           <div style={{ overflowY:"auto", padding:"18px 24px", borderRight:"1px solid #EDE6DC" }}>
-            <p style={{ margin:"0 0 6px", fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Show Details</p>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
+              <p style={{ margin:0, fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>{editingInfo ? "Edit Show Info" : "Show Details"}</p>
+              <button onClick={() => setEditingInfo(v => !v)}
+                style={{ fontSize:12, fontWeight:700, border:"2px solid", borderColor: editingInfo ? "#16A34A" : "#1B3A5C", background: editingInfo ? "#16A34A" : "#fff", color: editingInfo ? "#fff" : "#1B3A5C", borderRadius:8, padding:"5px 13px", cursor:"pointer" }}>
+                {editingInfo ? "✓ Done" : "✏️ Edit"}
+              </button>
+            </div>
+            {editingInfo ? (
+              <div>
+                {eInp("Show Name","name")}
+                <div style={{ marginBottom:10 }}>
+                  <label style={{ display:"block", fontSize:12, fontWeight:700, color:"#6B7280", marginBottom:4 }}>Status</label>
+                  <select value={show.status} onChange={e => setF("status", e.target.value)} style={eStyle}>
+                    {STATUS_ORDER.map(k => <option key={k} value={k}>{STATUSES[k].label}</option>)}
+                  </select>
+                </div>
+                <div style={{ marginBottom:10 }}>
+                  <label style={{ display:"block", fontSize:12, fontWeight:700, color:"#6B7280", marginBottom:4 }}>Category</label>
+                  <select value={show.category || ""} onChange={e => setF("category", e.target.value)} style={eStyle}>
+                    <option value="">Select a category…</option>
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div style={{ marginBottom:10 }}><CalendarPicker value={show.date} onChange={v => setF("date", v)} label="Start Date" /></div>
+                <div style={{ marginBottom:10 }}><CalendarPicker value={show.endDate} onChange={v => setF("endDate", v)} label="End Date (optional)" /></div>
+                {eInp("Start Time","startTime","time")}
+                {eInp("End Time","endTime","time")}
+                <div style={{ marginBottom:10 }}><CalendarPicker value={show.loadInDate} onChange={v => setF("loadInDate", v)} label="Load In Date" /></div>
+                {eInp("Load In Time","loadInTime","time")}
+                <div style={{ marginBottom:10 }}><CalendarPicker value={show.tearDownDate} onChange={v => setF("tearDownDate", v)} label="Tear Down Date" /></div>
+                {eInp("Tear Down Time","tearDownTime","time")}
+                <div style={{ marginBottom:10 }}>
+                  <label style={{ display:"block", fontSize:12, fontWeight:700, color:"#6B7280", marginBottom:4 }}>Address</label>
+                  <AddressAutocomplete value={show.street || ""} onChange={v => setF("street", v)}
+                    onPlaceSelected={({ street, city, state, zip }) => onUpdateShow({ ...show, street, city, state, zip })} />
+                </div>
+                {eInp("City","city")}
+                <div style={{ marginBottom:10 }}>
+                  <label style={{ display:"block", fontSize:12, fontWeight:700, color:"#6B7280", marginBottom:4 }}>State</label>
+                  <select value={show.state || ""} onChange={e => setF("state", e.target.value)} style={eStyle}>
+                    <option value="">Select state…</option>
+                    {US_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                {eInp("Zip Code","zip")}
+                {eInp("Contact Name","contactName")}
+                {eInp("Contact Email","contactEmail","email")}
+                {eInp("Contact Phone","contactPhone","tel")}
+                {eInp("Booth Size (e.g. 10x10)","boothSize")}
+                {eInp("Booth Number","boothNumber")}
+                {eInp("Expected Attendance","expectedParticipation","number")}
+                <div style={{ marginBottom:10 }}>
+                  <label style={{ display:"block", fontSize:12, fontWeight:700, color:"#6B7280", marginBottom:6 }}>Location Type</label>
+                  <div style={{ display:"flex", gap:8 }}>
+                    {["Indoor","Outdoor"].map(opt => {
+                      const on = opt === "Indoor" ? show.isIndoor : !show.isIndoor;
+                      return (
+                        <button key={opt} onClick={() => setF("isIndoor", opt === "Indoor")}
+                          style={{ flex:1, padding:"9px 0", borderRadius:8, border:"2px solid", borderColor: on ? "#1B3A5C" : "#EDE6DC", background: on ? "#1B3A5C" : "#fff", color: on ? "#fff" : "#6B7280", fontSize:14, fontWeight:700, cursor:"pointer" }}>
+                          {opt === "Indoor" ? "🏛 Indoor" : "☀️ Outdoor"}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div style={{ marginBottom:10, display:"flex", flexDirection:"column", gap:10 }}>
+                  <Toggle value={show.hasElectrical} onChange={v => setF("hasElectrical", v)} label="Electrical Available" />
+                  <Toggle value={show.needsTrailer}  onChange={v => setF("needsTrailer", v)}  label="Trailer Needed" />
+                </div>
+                {eInp("Employees Needed","employeesNeeded","number")}
+                {eInp("Contacts Collected (after show)","contactsCollected","number")}
+                <div style={{ marginBottom:10 }}>
+                  <label style={{ display:"block", fontSize:12, fontWeight:700, color:"#6B7280", marginBottom:4 }}>📌 Need to Know</label>
+                  <textarea value={show.needToKnow || ""} onChange={e => setF("needToKnow", e.target.value)} rows={4}
+                    placeholder="Day-of info employees need to know — parking, load-in, dress code, on-site contact, etc."
+                    style={{ ...eStyle, resize:"vertical", lineHeight:1.5 }} />
+                </div>
+                <div style={{ marginBottom:6 }}>
+                  <label style={{ display:"block", fontSize:12, fontWeight:700, color:"#6B7280", marginBottom:6 }}>Assign Employees</label>
+                  {employees.length === 0
+                    ? <p style={{ color:"#9CA3AF", margin:0, fontSize:13 }}>No employees added yet.</p>
+                    : <div style={{ display:"flex", flexWrap:"wrap", gap:8 }}>
+                        {employees.map(emp => {
+                          const on = (show.assignedEmployees || []).includes(emp.id);
+                          return (
+                            <button key={emp.id} onClick={() => toggleEmpAssign(emp.id)}
+                              style={{ padding:"7px 13px", borderRadius:18, border:"2px solid", borderColor: on ? "#1B3A5C" : "#EDE6DC", background: on ? "#1B3A5C" : "#fff", color: on ? "#fff" : "#4B5563", fontWeight:700, fontSize:13, cursor:"pointer" }}>
+                              {on ? "✓ " : ""}{emp.firstName} {emp.lastName}
+                            </button>
+                          );
+                        })}
+                      </div>}
+                </div>
+                <button onClick={() => setEditingInfo(false)}
+                  style={{ width:"100%", marginTop:8, padding:"12px", borderRadius:10, border:"none", background:"#16A34A", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>✓ Done</button>
+              </div>
+            ) : (<>
             {show.date && <Row label="Week #" value={`WK ${getISOWeek(new Date(show.date + "T12:00:00"))}`} accent={BRAND_BLUE} />}
             <Row label="Date" value={fmtDateRange(show.date, show.endDate)} />
             <Row label="Time" value={show.startTime && show.endTime ? show.startTime + " – " + show.endTime : null} />
@@ -1400,6 +1536,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
               <p style={{ margin:"18px 0 6px", fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Show Results</p>
               <Row label="Contacts Collected" value={(+show.contactsCollected).toLocaleString()} accent="#1B3A5C" />
             </>}
+            </>)}
           </div>
 
           {/* RIGHT — Widgets */}
@@ -1475,52 +1612,18 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
             </Widget>
             )}
 
-          {/* Financials Widget */}
+          {/* Financials Widget — cost + payments combined */}
             {isVisible("financials") && (
-            <Widget icon="💰" title="Financials" summary={totalExpenses > 0 ? `${fmtMoney(totalExpenses)} total cost` : "No costs entered yet"} defaultOpen={true}>
-              <p style={{ margin:"0 0 8px", fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Expense Breakdown</p>
-              {EXPENSE_FIELDS.map(f => (
-                <div key={f.key} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 0", borderBottom:"1px solid #F5EDE3" }}>
-                  <span style={{ fontSize:14, color:"#6B7280", fontWeight:500 }}>{f.label}</span>
-                  <div style={{ display:"flex", alignItems:"center", gap:4 }}>
-                    <span style={{ fontSize:13, color:"#9CA3AF" }}>$</span>
-                    <input
-                      type="number" min="0" step="0.01"
-                      value={show[f.key] ?? ""}
-                      onChange={e => onUpdateShow({ ...show, [f.key]: e.target.value === "" ? "" : +e.target.value })}
-                      onBlur={e => onUpdateShow({ ...show, [f.key]: +e.target.value || 0 })}
-                      style={{ width:90, textAlign:"right", border:"1px solid #EDE6DC", borderRadius:6, padding:"4px 8px", fontSize:14, fontWeight:700, color:"#1F2937", background:"#fff", outline:"none", fontFamily:"'Nunito',sans-serif" }}
-                      placeholder="0.00"
-                    />
-                  </div>
-                </div>
-              ))}
-              <div style={{ borderTop:"2px dashed #EDE6DC", margin:"8px 0 4px" }} />
-              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"6px 0" }}>
-                <span style={{ fontSize:14, fontWeight:800, color:"#1B3A5C" }}>Total Cost</span>
-                <span style={{ fontSize:16, fontWeight:800, color:"#1B3A5C" }}>{fmtMoney(totalExpenses)}</span>
-              </div>
-              <p style={{ margin:"14px 0 6px", fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Payment Status</p>
-              <textarea
-                value={show.paymentNotes || ""}
-                onChange={e => onUpdateShow({ ...show, paymentNotes: e.target.value })}
-                placeholder="e.g. Paid in full · Check #27041 · 12/10"
-                rows={2}
-                style={{ width:"100%", padding:"8px 10px", borderRadius:8, border:"1px solid #EDE6DC", fontSize:14, color:"#1F2937", outline:"none", boxSizing:"border-box", resize:"vertical", fontFamily:"'Nunito',sans-serif", lineHeight:1.5 }}
-              />
-            </Widget>
-            )}
-
-            {/* Payments Widget */}
-            {isVisible("payments") && (
-            <Widget icon="💳" title="Payments"
-              summary={payments.length > 0 ? `${fmtMoney(totalPaid)} paid · ${fmtMoney(Math.max(0,remaining))} remaining` : "No payments logged"}
+            <Widget icon="💰" title="Financials"
+              summary={(cost > 0 || totalPaid > 0)
+                ? `${fmtMoney(totalPaid)} paid of ${fmtMoney(cost)}${remaining > 0 ? ` · ${fmtMoney(remaining)} due` : (cost > 0 ? " · paid in full" : "")}`
+                : "No financials yet"}
               defaultOpen={true}>
-              {/* Summary bar */}
+              {/* Cost / Paid / Remaining */}
               <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:8, marginBottom:14 }}>
                 <div style={{ background:"#F7F2EB", borderRadius:9, padding:"10px 8px", textAlign:"center" }}>
                   <div style={{ fontSize:11, color:"#6B7280", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.04em" }}>Total Cost</div>
-                  <div style={{ fontSize:15, fontWeight:800, color:"#1B3A5C", marginTop:3 }}>{fmtMoney(totalExpenses)}</div>
+                  <div style={{ fontSize:15, fontWeight:800, color:"#1B3A5C", marginTop:3 }}>{fmtMoney(cost)}</div>
                 </div>
                 <div style={{ background:"#ECFDF5", borderRadius:9, padding:"10px 8px", textAlign:"center" }}>
                   <div style={{ fontSize:11, color:"#6B7280", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.04em" }}>Paid</div>
@@ -1531,6 +1634,23 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
                   <div style={{ fontSize:15, fontWeight:800, color: remaining > 0 ? "#DC2626" : "#059669", marginTop:3 }}>{fmtMoney(Math.max(0,remaining))}</div>
                 </div>
               </div>
+              {/* Total Show Cost — single field */}
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"0 0 12px", borderBottom:"1px solid #F5EDE3", marginBottom:12 }}>
+                <span style={{ fontSize:14, fontWeight:700, color:"#374151" }}>Total Show Cost</span>
+                <div style={{ display:"flex", alignItems:"center", gap:4 }}>
+                  <span style={{ fontSize:14, color:"#9CA3AF", fontWeight:700 }}>$</span>
+                  <input type="number" min="0" step="0.01"
+                    value={show.totalDue ?? ""}
+                    onChange={e => onUpdateShow({ ...show, totalDue: e.target.value === "" ? "" : +e.target.value })}
+                    onBlur={e => onUpdateShow({ ...show, totalDue: +e.target.value || 0 })}
+                    style={{ width:120, textAlign:"right", border:"2px solid #EDE6DC", borderRadius:7, padding:"6px 10px", fontSize:15, fontWeight:800, color:"#1B3A5C", background:"#fff", outline:"none", fontFamily:"'Nunito',sans-serif" }}
+                    placeholder="0.00" />
+                </div>
+              </div>
+              <p style={{ margin:"0 0 8px", fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>Payments</p>
+              {payments.length === 0 && !addingPayment && (
+                <p style={{ color:"#9CA3AF", margin:"0 0 8px", fontSize:14 }}>No payments logged yet.</p>
+              )}
               {/* Payment list */}
               {payments.map(p => (
                 <div key={p.id} style={{ background:"#F7F2EB", border:"1px solid #EDE6DC", borderRadius:9, padding:"10px 12px", marginBottom:7, display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
@@ -1830,9 +1950,8 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
 
         {/* ── Action row ── */}
         <div style={{ display:"flex", gap:10, padding:"14px 28px", borderTop:"2px solid #EDE6DC", flexShrink:0, background:"#FAFAF9" }}>
-          <button onClick={onEdit} style={{ flex:1, padding:"13px", borderRadius:11, border:"none", background:"#1B3A5C", color:"#fff", fontSize:15, fontWeight:700, cursor:"pointer" }}>✏️ Edit Show</button>
           <button onClick={onDuplicate}
-            style={{ padding:"13px 18px", borderRadius:11, border:"2px solid #EDE6DC", background:"#fff", color:"#6B7280", fontSize:14, fontWeight:700, cursor:"pointer" }}
+            style={{ flex:1, padding:"13px 18px", borderRadius:11, border:"2px solid #EDE6DC", background:"#fff", color:"#6B7280", fontSize:14, fontWeight:700, cursor:"pointer" }}
             onMouseEnter={e => { e.currentTarget.style.borderColor="#1B3A5C"; e.currentTarget.style.color="#1B3A5C"; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor="#EDE6DC"; e.currentTarget.style.color="#6B7280"; }}>
             ⧉ Duplicate
@@ -4319,7 +4438,7 @@ export default function App() {
         {/* ── Main content ── */}
         <div style={{ flex:1, overflowY:"auto", paddingBottom:isMobile?"72px":0 }}>
           {view==="dashboard" && <DashboardView shows={shows} setView={setView} onAddShow={openAdd} onViewShow={s=>setViewing(s)} isMobile={isMobile} userEmail={user?.email} />}
-          {view==="shows"     && <ShowsListView shows={shows} onAddShow={openAdd} onViewShow={s=>setViewing(s)} onDeleteShow={id=>setShows(p=>p.filter(s=>s.id!==id))} onImportShows={imported=>setShows(p=>[...p,...imported])} isMobile={isMobile} />}
+          {view==="shows"     && <ShowsListView shows={shows} onAddShow={openAdd} onViewShow={s=>setViewing(s)} onDeleteShow={id=>setShows(p=>p.filter(s=>s.id!==id))} onImportShows={imported=>setShows(p=>[...p,...imported.map(applyAutoStatus)])} isMobile={isMobile} />}
           {view==="pipeline"  && <PipelineView shows={shows} onUpdateShow={updateShow} onViewShow={s=>setViewing(s)} />}
           {view==="reports"   && <ReportsView shows={shows} isMobile={isMobile} />}
           {view==="calendar"  && <CalendarView shows={shows} onViewShow={s=>setViewing(s)} />}
