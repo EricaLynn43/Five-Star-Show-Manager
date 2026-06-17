@@ -1317,9 +1317,23 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
     ? (showIsLiveOrDone || sectionHasData.photos || addedSections.has(key))
     : (curStage >= (SECTION_STAGE[key] ?? 0) || sectionHasData[key] || addedSections.has(key));
   const hiddenSections = ADDABLE.filter(k => !isVisible(k));
+  // ── Tabbed layout (lifecycle-aware: tabs appear as the show progresses) ──
+  const SECTION_TAB = { commlog:"comms", financials:"financials", staff:"overview", inventory:"prep", documents:"prep", checklist:"prep", performance:"results", photos:"photos" };
+  const [activeTab, setActiveTab] = useState("overview");
+  const TAB_DEFS = [
+    { key:"overview",   icon:"📋", label:"Overview" },
+    { key:"financials", icon:"💰", label:"Financials", show: isVisible("financials") },
+    { key:"prep",       icon:"🧰", label:"Prep",       show: isVisible("checklist") || isVisible("inventory") || isVisible("documents") },
+    { key:"photos",     icon:"📷", label:"Photos",     show: isVisible("photos") },
+    { key:"comms",      icon:"💬", label:"Comms" },
+    { key:"results",    icon:"📊", label:"Results",    show: isVisible("performance") || isVisible("reports") || isVisible("rating") },
+  ];
+  const visibleTabs = TAB_DEFS.filter(t => t.show !== false);
+  const tab = visibleTabs.some(t => t.key === activeTab) ? activeTab : "overview";
   function addSection(key) {
     setAddedSections(prev => new Set(prev).add(key));
     setShowAddMenu(false);
+    setActiveTab(SECTION_TAB[key] || "overview");
   }
 
   // ── Inline Show Info editing (replaces the old "Edit Show" form) ──
@@ -1392,11 +1406,41 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
           </div>
         )}
 
-        {/* ── Two-column body ── */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", flex:"1 1 0", minHeight:0, overflow:"hidden" }}>
+        {/* ── Tab bar (lifecycle-aware) ── */}
+        <div style={{ display:"flex", borderBottom:"2px solid #EDE6DC", background:"#F7F2EB", flexShrink:0, overflowX:"auto", position:"relative" }}>
+          {visibleTabs.map(t => (
+            <button key={t.key} onClick={() => { setActiveTab(t.key); setShowAddMenu(false); }}
+              style={{ flex:"1 0 auto", minWidth:82, padding:"12px 10px", textAlign:"center", fontSize:13, fontWeight:700, cursor:"pointer", border:"none",
+                color: tab===t.key ? "#1B3A5C" : "#9CA3AF", background: tab===t.key ? "#fff" : "transparent",
+                borderBottom: tab===t.key ? "3px solid #1B3A5C" : "3px solid transparent", whiteSpace:"nowrap" }}>
+              {t.icon} {t.label}
+            </button>
+          ))}
+          {hiddenSections.length > 0 && (
+            <button onClick={() => setShowAddMenu(v => !v)} title="Add a section"
+              style={{ flexShrink:0, padding:"12px 15px", border:"none", background:"transparent", color:"#1B3A5C", fontSize:17, fontWeight:800, cursor:"pointer" }}>＋</button>
+          )}
+          {showAddMenu && hiddenSections.length > 0 && (
+            <div style={{ position:"absolute", top:"100%", right:6, zIndex:30, background:"#fff", border:"1px solid #EDE6DC", borderRadius:10, boxShadow:"0 8px 24px rgba(0,0,0,0.15)", padding:6, minWidth:200 }}>
+              <div style={{ fontSize:10, fontWeight:800, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em", padding:"4px 10px 6px" }}>Add a section</div>
+              {hiddenSections.map(key => (
+                <button key={key} onClick={() => addSection(key)}
+                  style={{ display:"flex", alignItems:"center", gap:8, width:"100%", padding:"9px 12px", border:"none", background:"transparent", color:"#1F2937", fontSize:13, fontWeight:700, cursor:"pointer", textAlign:"left", borderRadius:7 }}
+                  onMouseEnter={e => e.currentTarget.style.background="#F0F8FE"}
+                  onMouseLeave={e => e.currentTarget.style.background="transparent"}>
+                  <span style={{ fontSize:15 }}>{SECTION_META[key].icon}</span>{SECTION_META[key].label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
-          {/* LEFT — Show Details + Contact (view / inline edit) */}
-          <div style={{ overflowY:"auto", padding:"18px 24px", borderRight:"1px solid #EDE6DC" }}>
+        {/* ── Tab content (single scroll column) ── */}
+        <div style={{ flex:"1 1 0", minHeight:0, overflowY:"auto", padding:"18px 24px" }}>
+
+          {/* OVERVIEW TAB — Show details (view/inline edit) + staff */}
+          {tab === "overview" && (<>
+          <div>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
               <p style={{ margin:0, fontSize:11, fontWeight:700, color:"#9CA3AF", textTransform:"uppercase", letterSpacing:"0.06em" }}>{editingInfo ? "Edit Show Info" : "Show Details"}</p>
               <button onClick={() => setEditingInfo(v => !v)}
@@ -1538,12 +1582,10 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
             </>}
             </>)}
           </div>
+          </>)}{/* end Overview tab */}
 
-          {/* RIGHT — Widgets */}
-          <div style={{ overflowY:"auto", padding:"14px 18px" }}>
-
-          {/* Performance & Results Widget — TOP */}
-            {isVisible("performance") && (
+          {/* RESULTS TAB — Performance & Results */}
+            {tab === "results" && isVisible("performance") && (
             <Widget icon="📈" title="Performance & Results"
               summary={(() => {
                 const leads = show.leadCount||0, goal = +show.goal||0;
@@ -1612,8 +1654,8 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
             </Widget>
             )}
 
-          {/* Financials Widget — cost + payments combined */}
-            {isVisible("financials") && (
+          {/* FINANCIALS TAB — cost + payments combined */}
+            {tab === "financials" && isVisible("financials") && (
             <Widget icon="💰" title="Financials"
               summary={(cost > 0 || totalPaid > 0)
                 ? `${fmtMoney(totalPaid)} paid of ${fmtMoney(cost)}${remaining > 0 ? ` · ${fmtMoney(remaining)} due` : (cost > 0 ? " · paid in full" : "")}`
@@ -1724,8 +1766,8 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
             </Widget>
             )}
 
-            {/* Staff + Shifts Widget */}
-            {isVisible("staff") && (
+            {/* OVERVIEW TAB — Staff & Shifts */}
+            {tab === "overview" && isVisible("staff") && (
             <Widget icon="👥" title="Staff & Shifts" summary={`${assigned.length} of ${show.employeesNeeded||0} needed assigned`} defaultOpen={true}>
               {assigned.length === 0
                 ? <p style={{ color:"#9CA3AF", margin:"0 0 14px", fontSize:14 }}>No employees assigned yet.</p>
@@ -1745,8 +1787,8 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
             </Widget>
             )}
 
-            {/* Checklist Widget */}
-            {isVisible("checklist") && (
+            {/* PREP TAB — Pre-Show Checklist */}
+            {tab === "prep" && isVisible("checklist") && (
               <Widget icon="✅" title="Pre-Show Checklist" summary={checkItems.length > 0 ? `${checkDone}/${checkItems.length} complete · ${checkPct}%` : "Not started"} defaultOpen={checkPct < 100}>
                 {checkItems.length === 0 && (
                   <div style={{ textAlign:"center", padding:"14px 0" }}>
@@ -1788,8 +1830,8 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
               </Widget>
             )}
 
-            {/* Employee Reports Widget */}
-            {isVisible("reports") && (show.employeeReports||[]).length > 0 && (() => {
+            {/* RESULTS TAB — Employee Reports */}
+            {tab === "results" && isVisible("reports") && (show.employeeReports||[]).length > 0 && (() => {
               const reports = show.employeeReports;
               const totalLeads = reports.reduce((a,r) => a+(+r.leadsAcquired||0), 0);
               const totalAppts = reports.reduce((a,r) => a+(+r.appointmentsBooked||0), 0);
@@ -1816,8 +1858,8 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
               );
             })()}
 
-            {/* Show Rating Widget */}
-            {isVisible("rating") && (
+            {/* RESULTS TAB — Show Rating */}
+            {tab === "results" && isVisible("rating") && (
               <Widget icon="⭐" title="Show Rating" summary={show.rating ? "★".repeat(show.rating) : "Not yet rated"}>
                 <StarRating value={show.rating} onChange={r => onUpdateShow({ ...show, rating:r })} size={30} />
                 {show.rating && (
@@ -1828,22 +1870,22 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
               </Widget>
             )}
 
-            {/* Inventory Widget */}
-            {isVisible("inventory") && (
+            {/* PREP TAB — Inventory */}
+            {tab === "prep" && isVisible("inventory") && (
             <Widget icon="📦" title="Inventory">
               <InventorySection show={show} onUpdateShow={onUpdateShow} />
             </Widget>
             )}
 
-            {/* Documents Widget */}
-            {isVisible("documents") && (
+            {/* PREP TAB — Documents */}
+            {tab === "prep" && isVisible("documents") && (
             <Widget icon="📄" title="Documents">
               <DocumentsSection show={show} onUpdateShow={onUpdateShow} userId={userId} />
             </Widget>
             )}
 
-            {/* Show Photos Widget */}
-            {isVisible("photos") && (
+            {/* PHOTOS TAB — Show Photos */}
+            {tab === "photos" && isVisible("photos") && (
             <Widget icon="📷" title="Show Photos"
               summary={(show.photos||[]).length > 0 ? `${(show.photos||[]).length} photo${(show.photos||[]).length===1?"":"s"}` : "Arrival & tear-down"}
               defaultOpen={!!show.showActive}>
@@ -1851,8 +1893,8 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
             </Widget>
             )}
 
-            {/* Communications Widget */}
-            {isVisible("commlog") && (
+            {/* COMMS TAB — Communication Log */}
+            {tab === "comms" && isVisible("commlog") && (
             <Widget icon="💬" title="Communication Log" summary={comms.length > 0 ? `${comms.length} logged` : "None logged"}>
               <div style={{ display:"flex", justifyContent:"flex-end", marginBottom:12 }}>
                 {!addingComm && (
@@ -1916,37 +1958,7 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
             </Widget>
             )}
 
-            {/* ── Add a section (lifecycle-aware) ── */}
-            {hiddenSections.length > 0 && (
-              <div style={{ marginTop:6 }}>
-                {!showAddMenu
-                  ? <button onClick={() => setShowAddMenu(true)}
-                      style={{ width:"100%", padding:"11px", borderRadius:12, border:"2px dashed #C7BBA8", background:"#FBF8F3", color:"#6B7280", fontSize:14, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
-                      <span style={{ fontSize:18, lineHeight:1 }}>+</span> Add a section
-                    </button>
-                  : <div style={{ border:"1px solid #EDE6DC", borderRadius:12, padding:12, background:"#fff" }}>
-                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
-                        <span style={{ fontSize:13, fontWeight:800, color:"#1B3A5C", textTransform:"uppercase", letterSpacing:"0.05em" }}>Add a section</span>
-                        <button onClick={() => setShowAddMenu(false)}
-                          style={{ background:"none", border:"none", color:"#9CA3AF", fontSize:18, cursor:"pointer", lineHeight:1, padding:2 }}>×</button>
-                      </div>
-                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8 }}>
-                        {hiddenSections.map(key => (
-                          <button key={key} onClick={() => addSection(key)}
-                            style={{ display:"flex", alignItems:"center", gap:8, padding:"10px 12px", borderRadius:10, border:"1px solid #EDE6DC", background:"#FBF8F3", color:"#1F2937", fontSize:13, fontWeight:700, cursor:"pointer", textAlign:"left" }}
-                            onMouseEnter={e => { e.currentTarget.style.borderColor="#1B3A5C"; e.currentTarget.style.background="#F0F8FE"; }}
-                            onMouseLeave={e => { e.currentTarget.style.borderColor="#EDE6DC"; e.currentTarget.style.background="#FBF8F3"; }}>
-                            <span style={{ fontSize:16 }}>{SECTION_META[key].icon}</span>{SECTION_META[key].label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                }
-              </div>
-            )}
-
-          </div>{/* end right widgets column */}
-        </div>{/* end two-column grid */}
+          </div>{/* end tab content */}
 
         {/* ── Action row ── */}
         <div style={{ display:"flex", gap:10, padding:"14px 28px", borderTop:"2px solid #EDE6DC", flexShrink:0, background:"#FAFAF9" }}>
