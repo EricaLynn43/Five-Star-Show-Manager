@@ -1603,11 +1603,19 @@ function ShowDetailModal({ show, employees, onEdit, onClose, onUpdateShow, onDup
                 </div>
                 <div style={{ background:(show.leadCount||0)>=(+show.goal||1)&&(+show.goal||0)>0?"#ECFDF5":"#F7F2EB", borderRadius:9, padding:"10px 12px" }}>
                   <div style={{ fontSize:11, color:"#6B7280", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:4 }}>Leads</div>
-                  <div style={{ fontSize:20, fontWeight:800, color:"#1B3A5C" }}>{show.leadCount||0}</div>
+                  <input type="number" min="0" value={show.leadCount ?? ""}
+                    onChange={e => onUpdateShow({ ...show, leadCount: e.target.value===""?"":+e.target.value })}
+                    onBlur={e => onUpdateShow({ ...show, leadCount: +e.target.value||0 })}
+                    style={{ width:"100%", border:"none", borderBottom:"2px solid #EDE6DC", background:"transparent", fontSize:20, fontWeight:800, color:"#1B3A5C", outline:"none", fontFamily:"'Nunito',sans-serif", padding:"2px 0" }}
+                    placeholder="—" />
                 </div>
                 <div style={{ background:"#F0F8FE", borderRadius:9, padding:"10px 12px" }}>
                   <div style={{ fontSize:11, color:"#6B7280", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:4 }}>Set (Appts)</div>
-                  <div style={{ fontSize:20, fontWeight:800, color:BRAND_BLUE }}>{show.appointmentCount||0}</div>
+                  <input type="number" min="0" value={show.appointmentCount ?? ""}
+                    onChange={e => onUpdateShow({ ...show, appointmentCount: e.target.value===""?"":+e.target.value })}
+                    onBlur={e => onUpdateShow({ ...show, appointmentCount: +e.target.value||0 })}
+                    style={{ width:"100%", border:"none", borderBottom:"2px solid #BAE6FD", background:"transparent", fontSize:20, fontWeight:800, color:BRAND_BLUE, outline:"none", fontFamily:"'Nunito',sans-serif", padding:"2px 0" }}
+                    placeholder="—" />
                 </div>
                 <div style={{ background:"#F7F2EB", borderRadius:9, padding:"10px 12px" }}>
                   <div style={{ fontSize:11, color:"#6B7280", fontWeight:700, textTransform:"uppercase", letterSpacing:"0.04em", marginBottom:4 }}>Last Year</div>
