@@ -169,7 +169,7 @@ function applyAutoStatus(show) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const showDate = s.date ? new Date(s.date) : null;
   const daysUntil = showDate ? Math.ceil((showDate - today) / (1000 * 60 * 60 * 24)) : 999;
-  if (s.status === "lead" && (+s.depositPaid || 0) > 0) s.status = "booked";
+  if (s.status === "lead" && ((+s.depositPaid || 0) + (+s.totalPaid || 0)) > 0) s.status = "booked";
   if (s.status === "booked" && getAssignedEmpIds(s).size > 0) s.status = "preshow";
   if (s.status === "preshow" && daysUntil <= 7 && daysUntil >= 0) {
     s.status = "countdown";
@@ -2670,6 +2670,8 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [search, setSearch] = useState("");
   const [showImport, setShowImport] = useState(false);
+  const [sortKey, setSortKey] = useState("Date");   // click a column header to sort
+  const [sortDir, setSortDir] = useState("asc");
   const dateFilterRef = useRef(null);
   const { confirm, ConfirmDialog } = useConfirm();
 
@@ -2692,6 +2694,33 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
   });
   const totalShowCost = filtered.reduce((a, s) => a + (+s.totalDue || 0), 0);
   const dateFilterActive = filterDateFrom || filterDateTo;
+
+  // ── Column sorting ──
+  const SORT_VAL = {
+    "Show Name":    s => (s.name || "").toLowerCase(),
+    "Date":         s => s.date || "9999-99-99",                 // undated shows sort last
+    "Category":     s => (s.category || "").toLowerCase(),
+    "Status":       s => { const i = STATUS_ORDER.indexOf(s.status); return i < 0 ? 99 : i; }, // groups by lifecycle stage
+    "Booth":        s => (s.boothSize || "").toLowerCase(),
+    "Staff":        s => getAssignedEmpIds(s).size,
+    "Show Total":   s => +s.totalDue || 0,
+    "Deposit Paid": s => +s.depositPaid || 0,
+    "Balance":      s => (+s.totalDue || 0) - (+s.depositPaid || 0) - (+s.totalPaid || 0),
+  };
+  function toggleSort(key) {
+    if (!SORT_VAL[key]) return;
+    if (sortKey === key) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
+  }
+  const sortArrow = key => sortKey === key ? (sortDir === "asc" ? " ▲" : " ▼") : "";
+  const sorted = SORT_VAL[sortKey]
+    ? [...filtered].sort((a, b) => {
+        const va = SORT_VAL[sortKey](a), vb = SORT_VAL[sortKey](b);
+        const c = va < vb ? -1 : va > vb ? 1 : 0;
+        return sortDir === "asc" ? c : -c;
+      })
+    : filtered;
+
   return (
     <div style={{ padding: isMobile ? "20px 16px" : "36px 44px" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:28, flexWrap:"wrap", gap:12 }}>
@@ -2730,9 +2759,9 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
       </div>
       {isMobile ? (
         <div style={{ display:"flex", flexDirection:"column", gap:10 }}>
-          {filtered.length === 0
+          {sorted.length === 0
             ? <p style={{ textAlign:"center", color:"#9CA3AF", padding:40 }}>No shows match your search.</p>
-            : filtered.map(show => {
+            : sorted.map(show => {
                 const balance = Math.max(0, (+show.totalDue||0) - (+show.depositPaid||0) - (+show.totalPaid||0));
                 const st = STATUSES[show.status];
                 return (
@@ -2758,15 +2787,18 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
             <table style={{ width:"100%", borderCollapse:"collapse" }}>
               <thead>
                 <tr style={{ background:"#F7F2EB", borderBottom:"2px solid #EDE6DC" }}>
-                  <th style={{ padding:"14px 18px", textAlign:"left", fontSize:14, fontWeight:700, color:"#4B5563", textTransform:"uppercase", letterSpacing:"0.05em", whiteSpace:"nowrap" }}>Show Name</th>
+                  <th onClick={() => toggleSort("Show Name")} style={{ padding:"14px 18px", textAlign:"left", fontSize:14, fontWeight:700, color: sortKey==="Show Name"?BRAND_BLUE:"#4B5563", textTransform:"uppercase", letterSpacing:"0.05em", whiteSpace:"nowrap", cursor:"pointer", userSelect:"none" }}>Show Name{sortArrow("Show Name")}</th>
                   <th style={{ padding:"14px 18px", textAlign:"left", fontSize:14, fontWeight:700, textTransform:"uppercase", letterSpacing:"0.05em", whiteSpace:"nowrap" }}>
-                    <div ref={dateFilterRef} style={{ position:"relative", display:"inline-block" }}>
-                      <button onClick={() => setShowDateFilter(o => !o)} style={{
+                    <div ref={dateFilterRef} style={{ position:"relative", display:"inline-flex", alignItems:"center", gap:6 }}>
+                      <span onClick={() => toggleSort("Date")} style={{ cursor:"pointer", userSelect:"none",
+                        color: sortKey==="Date" ? BRAND_BLUE : "#4B5563", fontWeight:700, fontSize:14,
+                        textTransform:"uppercase", letterSpacing:"0.05em" }}>
+                        Date{sortArrow("Date")}
+                      </span>
+                      <button onClick={() => setShowDateFilter(o => !o)} title="Filter by date range" style={{
                         background:"none", border:"none", cursor:"pointer", padding:0,
-                        display:"flex", alignItems:"center", gap:5,
-                        color: dateFilterActive ? BRAND_BLUE : "#4B5563", fontWeight:700, fontSize:14,
-                        textTransform:"uppercase", letterSpacing:"0.05em", fontFamily:"'Nunito',sans-serif" }}>
-                        Date {dateFilterActive ? "🔽" : "▾"}
+                        color: dateFilterActive ? BRAND_BLUE : "#9CA3AF", fontWeight:700, fontSize:13 }}>
+                        {dateFilterActive ? "🔽" : "▾"}
                       </button>
                       {showDateFilter && (
                         <div style={{ position:"absolute", top:"calc(100% + 8px)", left:0, zIndex:3000,
@@ -2804,15 +2836,21 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
                       )}
                     </div>
                   </th>
-                  {["Category","Status","Booth","Staff","Show Total","Deposit Paid","Balance",""].map((h, i) => (
-                    <th key={i} style={{ padding:"14px 18px", textAlign:"left", fontSize:14, fontWeight:700, color:"#4B5563", textTransform:"uppercase", letterSpacing:"0.05em", whiteSpace:"nowrap" }}>{h}</th>
-                  ))}
+                  {["Category","Status","Booth","Staff","Show Total","Deposit Paid","Balance",""].map((h, i) => {
+                    const sortable = !!SORT_VAL[h];
+                    return (
+                      <th key={i} onClick={sortable ? () => toggleSort(h) : undefined}
+                        style={{ padding:"14px 18px", textAlign:"left", fontSize:14, fontWeight:700,
+                          color: sortKey===h ? BRAND_BLUE : "#4B5563", textTransform:"uppercase", letterSpacing:"0.05em",
+                          whiteSpace:"nowrap", cursor: sortable ? "pointer" : "default", userSelect:"none" }}>{h}{sortArrow(h)}</th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
                 {filtered.length === 0
                   ? <tr><td colSpan={9} style={{ padding:40, textAlign:"center", color:"#9CA3AF", fontSize:16 }}>No shows match your search or filter.</td></tr>
-                  : filtered.map(show => {
+                  : sorted.map(show => {
                       const balance = (+show.totalDue||0) - (+show.depositPaid||0) - (+show.totalPaid||0);
                       return (
                         <tr key={show.id} onClick={() => onViewShow(show)}
