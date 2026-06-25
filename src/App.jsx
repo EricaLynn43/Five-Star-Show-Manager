@@ -2729,6 +2729,43 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
       })
     : filtered;
 
+  // ── Export to CSV (round-trips with the importer's column names) ──
+  function exportCSV() {
+    const COLS = [
+      ["Show Name",       s => s.name],
+      ["Start Date",      s => s.date],
+      ["End Date",        s => s.endDate],
+      ["Status",          s => (STATUSES[s.status] || {}).label || s.status],
+      ["Category",        s => s.category],
+      ["City",            s => s.city],
+      ["Booth Size",      s => s.boothSize],
+      ["Booth Number",    s => s.boothNumber],
+      ["Total Show Cost", s => s.totalDue],
+      ["Deposit Paid",    s => s.depositPaid],
+      ["Final Paid",      s => s.totalPaid],
+      ["Balance",         s => (+s.totalDue||0) - (+s.depositPaid||0) - (+s.totalPaid||0)],
+      ["Leads",           s => s.leadCount],
+      ["Appointments",    s => s.appointmentCount],
+      ["Sale Amount",     s => s.salesAmount],
+      ["Contact Name",    s => s.contactName],
+      ["Contact Email",   s => s.contactEmail],
+      ["Contact Phone",   s => s.contactPhone],
+      ["Notes",           s => s.needToKnow],
+    ];
+    const esc = v => { v = v == null ? "" : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    const rows = [...shows].sort((a, b) => (a.date || "9999").localeCompare(b.date || "9999"));
+    const csv = [COLS.map(c => c[0]).join(",")]
+      .concat(rows.map(s => COLS.map(c => esc(c[1](s))).join(",")))
+      .join("\r\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `five-star-shows-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div style={{ padding: isMobile ? "20px 16px" : "36px 44px" }}>
       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:28, flexWrap:"wrap", gap:12 }}>
@@ -2738,6 +2775,10 @@ function ShowsListView({ shows, onAddShow, onViewShow, onDeleteShow, onImportSho
         </div>
         {!isMobile && (
           <div style={{ display:"flex", gap:10 }}>
+            <button onClick={exportCSV} disabled={shows.length === 0} title="Download all shows as a spreadsheet (CSV)"
+              style={{ background:"#fff", color:"#1B3A5C", border:"2px solid #1B3A5C", borderRadius:12, padding:"14px 22px", fontSize:16, fontWeight:700, cursor: shows.length ? "pointer" : "not-allowed", opacity: shows.length ? 1 : 0.5, display:"flex", alignItems:"center", gap:8 }}>
+              ⬇ Download CSV
+            </button>
             <button onClick={() => setShowImport(true)} style={{ background:"#fff", color:"#1B3A5C", border:"2px solid #1B3A5C", borderRadius:12, padding:"14px 22px", fontSize:16, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:8 }}>
               📥 Import
             </button>
